@@ -1,0 +1,18 @@
+[package]
+name = "local-ip-address"
+description = "Retrive system's local IP address"
+repository = "https://github.com/EstebanBorai/local-ip-address"
+categories = ["web-programming"]
+homepage = "https://github.com/EstebanBorai/local-ip-address"
+keywords = ["local", "ip", "address", "web", "network"]
+license = "MIT OR Apache-2.0"
+version = "0.1.0"
+authors = ["Esteban Borai <estebanborai@gmail.com>"]
+edition = "2018"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+regex = "1"
+thiserror = "1"
