@@ -1,4 +1,5 @@
 use libc::{getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, AF_INET, AF_INET6};
+use std::env;
 use std::ffi::CStr;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -9,11 +10,16 @@ type IfAddrsPtr = *mut *mut ifaddrs;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    /// An error occured building a `&str` from a C string when
+    /// parsing the name of a interface address instance
     #[error("Failed to read interface address name. `{0}`")]
     IntAddrNameParseError(Utf8Error),
     /// An error ocurred calling `getifaddrs`
     #[error("Execution of getifaddrs had error result. getifaddrs returned `{0}`")]
     GetIfAddrsError(i32),
+    /// The current platform is not supported
+    #[error("The current platform `{0}` is not supported")]
+    PlatformNotSupported(String),
 }
 
 /// Perform a search over the system's network interfaces using `getifaddrs`,
@@ -105,6 +111,27 @@ pub fn find_af_inet<'a>() -> Result<Vec<(&'a str, IpAddr)>, Error> {
 
         Ok(interfaces)
     }
+}
+
+/// Retrieves the local ip address for the current operative system
+pub fn local_ip() -> Result<IpAddr, Error> {
+    let ifas = find_af_inet()?;
+
+    if cfg!(target_os = "macos") {
+        if let Some((_, ipaddr)) = find_ifa(&ifas, "en0") {
+            return Ok(*ipaddr);
+        }
+    }
+
+    Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
+}
+
+pub fn find_ifa<'a>(
+    ifas: &'a Vec<(&'a str, IpAddr)>,
+    ifa_name: &str,
+) -> Option<&'a (&'a str, IpAddr)> {
+    ifas.iter()
+        .find(|(name, ipaddr)| *name == ifa_name && matches!(ipaddr, IpAddr::V4(_)))
 }
 
 /// Retrieves the name of a interface address
