@@ -13,28 +13,36 @@
 
 </div>
 
-Provides utility functions to get system's local network IP address by executing
-OS commands in the host machine.
-
-The output from the executed command is then parsed and an instance of a `IpAddr`
-is returned from the function.
+A wrapper on `getifaddrs` which retrieves host's
+network interfaces.
+Handy functions are provided such as `local_ip` which retrieve the local IP
+address based on the host system
 
 ```rust
+use std::net::IpAddr;
 use local_ip_address::local_ip;
 
-fn main() {
-    let my_local_ip_address = local_ip().unwrap();
-
-    println!("{:?}", my_local_ip_address);
-}
+assert!(matches!(local_ip().unwrap(), IpAddr));
 ```
 
-Every host may or may not have a different approach on gathering the local IP
+You are able to iterate over a vector of tuples where the first element of
+the tuple is the name of the network interface and the second is the IP
 address.
 
-`local-ip-address` crate implements [Conditional Compilation](https://doc.rust-lang.org/reference/conditional-compilation.html#conditional-compilation)
-to execute different approaches based on host machine operative system.
+```rust
+use std::net::IpAddr;
+use local_ip_address::find_af_inet;
 
+let ifas = find_af_inet().unwrap();
+
+if let Some((_, ipaddr)) = ifas
+.iter()
+.find(|(name, ipaddr)| *name == "en0" && matches!(ipaddr, IpAddr::V4(_))) {
+    println!("This is your local IP address: {:?}", ipaddr);
+    // This is your local IP address: 192.168.1.111
+    assert!(matches!(ipaddr, IpAddr));
+}
+```
 
 ## Release
 
