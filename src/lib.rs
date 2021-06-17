@@ -123,6 +123,12 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         }
     }
 
+    if cfg!(target_os = "linux") {
+        if let Some((_, ipaddr)) = find_ifa(&ifas, "wlp2s0") {
+            return Ok(*ipaddr);
+        }
+    }
+
     Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
 }
 
