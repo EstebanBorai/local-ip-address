@@ -1,5 +1,5 @@
 use crate::Error;
-use libc::{getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, AF_INET, AF_INET6};
+use libc::{getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, strlen, AF_INET, AF_INET6};
 use std::env;
 use std::ffi::CStr;
 use std::mem;
@@ -7,26 +7,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 /// `ifaddrs` struct raw pointer alias
 type IfAddrsPtr = *mut *mut ifaddrs;
 
-/// Perform a search over the system's network interfaces using `getifaddrs`,
-/// retrieved network interfaces belonging to both socket address families
-/// `AF_INET` and `AF_INET6` are retrieved along with the interface address name.
-///
-/// # Example
-///
-/// ```
-/// use std::net::IpAddr;
-/// use local_ip_address::find_af_inet;
-///
-/// let ifas = find_af_inet().unwrap();
-///
-/// if let Some((_, ipaddr)) = ifas
-/// .iter()
-/// .find(|(name, ipaddr)| *name == "en0" && matches!(ipaddr, IpAddr::V4(_))) {
-///     // This is your local IP address: 192.168.1.111
-///     println!("This is your local IP address: {:?}", ipaddr);
-/// }
-/// ```
-pub fn find_af_inet<'a>() -> Result<Vec<(&'a str, IpAddr)>, Error> {
+pub fn impl_find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
     let ifaddrs_size = mem::size_of::<IfAddrsPtr>();
 
     unsafe {
@@ -38,7 +19,7 @@ pub fn find_af_inet<'a>() -> Result<Vec<(&'a str, IpAddr)>, Error> {
             return Err(Error::GetIfAddrsError(getifaddrs_result));
         }
 
-        let mut interfaces: Vec<(&'a str, IpAddr)> = Vec::new();
+        let mut interfaces: Vec<(String, IpAddr)> = Vec::new();
         let ifa = myaddr;
 
         // An instance of `ifaddrs` is build on top of a linked list where
@@ -98,38 +79,13 @@ pub fn find_af_inet<'a>() -> Result<Vec<(&'a str, IpAddr)>, Error> {
     }
 }
 
-/// Retrieves the local ip address for the current operative system
-pub fn local_ip() -> Result<IpAddr, Error> {
-    let ifas = find_af_inet()?;
-
-    if cfg!(target_os = "macos") {
-        if let Some((_, ipaddr)) = find_ifa(&ifas, "en0") {
-            return Ok(*ipaddr);
-        }
-    }
-
-    if cfg!(target_os = "linux") {
-        if let Some((_, ipaddr)) = find_ifa(&ifas, "wlp2s0") {
-            return Ok(*ipaddr);
-        }
-    }
-
-    Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
-}
-
-/// Finds the network interface with the provided name in the vector of network
-/// interfaces provided
-pub fn find_ifa<'a>(
-    ifas: &'a [(&'a str, IpAddr)],
-    ifa_name: &str,
-) -> Option<&'a (&'a str, IpAddr)> {
-    ifas.iter()
-        .find(|(name, ipaddr)| *name == ifa_name && matches!(ipaddr, IpAddr::V4(_)))
-}
-
 /// Retrieves the name of a interface address
-unsafe fn get_ifa_name<'a>(ifa: *mut *mut ifaddrs) -> Result<&'a str, Error> {
-    CStr::from_ptr((**ifa).ifa_name)
-        .to_str()
-        .map_err(Error::IntAddrNameParseError)
+unsafe fn get_ifa_name(ifa: *mut *mut ifaddrs) -> Result<String, Error> {
+    let str = (*(*ifa)).ifa_name as *mut u8;
+    let len = strlen(str as *const i8);
+    let slice = std::slice::from_raw_parts(str, len);
+    match String::from_utf8(slice.to_vec()) {
+        Ok(s) => Ok(s),
+        Err(_e) => Err(Error::IntAddrNameParseError(_e)),
+    }
 }
