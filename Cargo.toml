@@ -16,3 +16,8 @@ readme = "README.md"
 [dependencies]
 libc = "0.2"
 thiserror = "1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = "0.11.0"
+memalloc = "0.1"
+bindings = { package = "bindings", path = "src/windows/bindings" }
