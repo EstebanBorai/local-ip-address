@@ -31,23 +31,77 @@
 //! ```
 //!
 
-use std::str::Utf8Error;
-
+use std::string::FromUtf8Error;
+use std::{env, net::IpAddr};
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     /// An error occured building a `&str` from a C string when
     /// parsing the name of a interface address instance
     #[error("Failed to read interface address name. `{0}`")]
-    IntAddrNameParseError(Utf8Error),
+    IntAddrNameParseError(FromUtf8Error),
     /// An error ocurred calling `getifaddrs`
     #[error("Execution of getifaddrs had error result. getifaddrs returned `{0}`")]
     GetIfAddrsError(i32),
     /// The current platform is not supported
     #[error("The current platform `{0}` is not supported")]
     PlatformNotSupported(String),
+    #[error("GetIpAddrTableError")]
+    GetAdaptersAddresses(u32),
 }
 
 #[cfg(target_family = "unix")]
 pub mod unix;
+#[cfg(target_family = "unix")]
+use crate::unix::*;
 #[cfg(target_family = "windows")]
 pub mod windows;
+#[cfg(target_family = "windows")]
+use crate::windows::*;
+
+/// Perform a search over the system's network interfaces using `getifaddrs`,
+/// retrieved network interfaces belonging to both socket address families
+/// `AF_INET` and `AF_INET6` are retrieved along with the interface address name.
+///
+/// # Example
+///
+/// ```
+/// use std::net::IpAddr;
+/// use local_ip_address::find_af_inet;
+///
+/// let ifas = find_af_inet().unwrap();
+///
+/// if let Some((_, ipaddr)) = ifas
+/// .iter()
+/// .find(|(name, ipaddr)| *name == "en0" && matches!(ipaddr, IpAddr::V4(_))) {
+///     // This is your local IP address: 192.168.1.111
+///     println!("This is your local IP address: {:?}", ipaddr);
+/// }
+/// ```
+pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
+    impl_find_af_inet()
+}
+
+/// Finds the network interface with the provided name in the vector of network
+/// interfaces provided
+pub fn find_ifa(ifas: Vec<(String, IpAddr)>, ifa_name: &str) -> Option<(String, IpAddr)> {
+    ifas.into_iter()
+        .find(|(name, ipaddr)| name == ifa_name && matches!(ipaddr, IpAddr::V4(_)))
+}
+
+/// Retrieves the local ip address for the current operative system
+pub fn local_ip() -> Result<IpAddr, Error> {
+    let ifas = find_af_inet()?;
+
+    #[cfg(target_os = "macos")]
+    const DEFAULT_IF_NAME: &str = "en0";
+    #[cfg(target_os = "linux")]
+    const DEFAULT_IF_NAME: &str = "wlp2s0";
+    #[cfg(target_os = "windows")]
+    const DEFAULT_IF_NAME: &str = "Ethernet";
+
+    if let Some((_, ipaddr)) = find_ifa(ifas, DEFAULT_IF_NAME) {
+        return Ok(ipaddr);
+    }
+
+    Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
+}
