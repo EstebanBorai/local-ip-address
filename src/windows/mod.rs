@@ -34,14 +34,15 @@ use crate::Error;
 /// ```
 pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
     let mut out: Vec<(String, IpAddr)> = Vec::new();
-    let mut dwsize: u32 = 2000; //20kb should be enough to prevent realloc
-
+    // 20kb should be enough to prevent realloc
+    let mut dwsize: u32 = 2000;
     let mut mem = unsafe { allocate(dwsize as usize) } as *mut IP_ADAPTER_ADDRESSES_LH;
-
     let mut n_tries = 3;
     let mut ret_val: u32 = 0;
+
     loop {
         let old_size = dwsize as usize;
+
         ret_val = unsafe {
             GetAdaptersAddresses(
                 ADDRESS_FAMILY(AF_UNSPEC.0),
@@ -51,16 +52,20 @@ pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
                 &mut dwsize,
             )
         };
+
         if ret_val != ERROR_BUFFER_OVERFLOW.0 || n_tries <= 0 {
             break;
         }
+
         unsafe { deallocate(mem as *mut u8, old_size as usize) };
+
         mem = unsafe { allocate(dwsize as usize) as *mut IP_ADAPTER_ADDRESSES_LH };
         n_tries -= 1;
     }
 
     if ret_val == NO_ERROR.0 {
         let mut cur = mem;
+
         while !cur.is_null() {
             let fname = unsafe { (*cur).FriendlyName.0 };
             let len = unsafe { wcslen(fname as *const wchar_t) };
@@ -88,6 +93,7 @@ pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
 
                     let ip = IpAddr::V4(ipv4);
                     let name = String::from_utf16(slice).unwrap();
+
                     out.push((name, ip));
                 }
                 cur_a = unsafe { (*cur_a).Next };
@@ -99,10 +105,13 @@ pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
         unsafe {
             deallocate(mem as *mut u8, dwsize as usize);
         }
+
         return Err(Error::GetAdaptersAddresses(ret_val));
     }
+
     unsafe {
         deallocate(mem as *mut u8, dwsize as usize);
     }
+
     return Ok(out);
 }
