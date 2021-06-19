@@ -20,4 +20,4 @@ thiserror = "1"
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = "0.11.0"
 memalloc = "0.1"
-bindings = { version = "0.1.0", package = "bindings", path = "src/windows/bindings" }
+bindings = { path = "src/windows/bindings" }
