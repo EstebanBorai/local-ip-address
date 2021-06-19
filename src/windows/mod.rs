@@ -1,15 +1,12 @@
-use bindings::Windows::Win32::{
-    NetworkManagement::IpHelper::{
-        ADDRESS_FAMILY, AF_INET, AF_INET6, AF_UNSPEC, GET_ADAPTERS_ADDRESSES_FLAGS,
-        IP_ADAPTER_ADDRESSES_LH, GetAdaptersAddresses,
-    },
-    Networking::WinSock::{SOCKADDR_IN, SOCKADDR_IN6},
-    System::Diagnostics::Debug::{ERROR_BUFFER_OVERFLOW, NO_ERROR},
-};
-
 use libc::{wchar_t, wcslen};
 use memalloc::{allocate, deallocate};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use bindings::Windows::Win32::System::Diagnostics::Debug::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
+use bindings::Windows::Win32::Networking::WinSock::{SOCKADDR_IN, SOCKADDR_IN6};
+use bindings::Windows::Win32::NetworkManagement::IpHelper::{
+    ADDRESS_FAMILY, AF_INET, AF_INET6, AF_UNSPEC, GET_ADAPTERS_ADDRESSES_FLAGS,
+    IP_ADAPTER_ADDRESSES_LH, GetAdaptersAddresses,
+};
 
 use crate::Error;
 
@@ -38,7 +35,7 @@ pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
     let mut dwsize: u32 = 2000;
     let mut mem = unsafe { allocate(dwsize as usize) } as *mut IP_ADAPTER_ADDRESSES_LH;
     let mut n_tries = 3;
-    let mut ret_val: u32 = 0;
+    let mut ret_val;
 
     loop {
         let old_size = dwsize as usize;
@@ -47,7 +44,7 @@ pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
             GetAdaptersAddresses(
                 ADDRESS_FAMILY(AF_UNSPEC.0),
                 GET_ADAPTERS_ADDRESSES_FLAGS(0x0),
-                0 as *mut std::ffi::c_void,
+                std::ptr::null_mut::<std::ffi::c_void>(),
                 mem,
                 &mut dwsize,
             )
@@ -113,5 +110,5 @@ pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
         deallocate(mem as *mut u8, dwsize as usize);
     }
 
-    return Ok(out);
+    Ok(out)
 }
