@@ -7,7 +7,7 @@ on:
 
 jobs:
   fmt:
-    name: Runs "cargo fmt" on ${{ matrix.os }}
+    name: Runs "cargo test" on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -26,7 +26,6 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-          components: rustfmt
 
       - name: Cache .cargo and target
         uses: actions/cache@v2
@@ -39,8 +38,7 @@ jobs:
             ${{ runner.os }}-cargo-fmt-${{ hashFiles('**/Cargo.lock') }}
             ${{ runner.os }}-cargo-fmt
 
-      - name: Run fmt
+      - name: Run tests
         uses: actions-rs/cargo@v1
         with:
-          command: fmt
-          args: --all -- --check
+          command: test
