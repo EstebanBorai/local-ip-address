@@ -7,7 +7,26 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 /// `ifaddrs` struct raw pointer alias
 type IfAddrsPtr = *mut *mut ifaddrs;
 
-pub fn impl_find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
+/// Perform a search over the system's network interfaces using `getifaddrs`,
+/// retrieved network interfaces belonging to both socket address families
+/// `AF_INET` and `AF_INET6` are retrieved along with the interface address name.
+///
+/// # Example
+///
+/// ```
+/// use std::net::IpAddr;
+/// use local_ip_address::find_af_inet;
+///
+/// let ifas = find_af_inet().unwrap();
+///
+/// if let Some((_, ipaddr)) = ifas
+/// .iter()
+/// .find(|(name, ipaddr)| *name == "en0" && matches!(ipaddr, IpAddr::V4(_))) {
+///     // This is your local IP address: 192.168.1.111
+///     println!("This is your local IP address: {:?}", ipaddr);
+/// }
+/// ```
+pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
     let ifaddrs_size = mem::size_of::<IfAddrsPtr>();
 
     unsafe {

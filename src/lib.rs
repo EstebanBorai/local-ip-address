@@ -52,34 +52,11 @@ pub enum Error {
 #[cfg(target_family = "unix")]
 pub mod unix;
 #[cfg(target_family = "unix")]
-use crate::unix::*;
+pub use crate::unix::*;
 #[cfg(target_family = "windows")]
 pub mod windows;
 #[cfg(target_family = "windows")]
-use crate::windows::*;
-
-/// Perform a search over the system's network interfaces using `getifaddrs`,
-/// retrieved network interfaces belonging to both socket address families
-/// `AF_INET` and `AF_INET6` are retrieved along with the interface address name.
-///
-/// # Example
-///
-/// ```
-/// use std::net::IpAddr;
-/// use local_ip_address::find_af_inet;
-///
-/// let ifas = find_af_inet().unwrap();
-///
-/// if let Some((_, ipaddr)) = ifas
-/// .iter()
-/// .find(|(name, ipaddr)| *name == "en0" && matches!(ipaddr, IpAddr::V4(_))) {
-///     // This is your local IP address: 192.168.1.111
-///     println!("This is your local IP address: {:?}", ipaddr);
-/// }
-/// ```
-pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
-    impl_find_af_inet()
-}
+pub use crate::windows::*;
 
 /// Finds the network interface with the provided name in the vector of network
 /// interfaces provided

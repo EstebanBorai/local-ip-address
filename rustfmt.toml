@@ -179,7 +179,7 @@
 
 # Reorder import statements alphabetically.
 # Default: false
-#   reorder_imports = 
+reorder_imports = false
 
 # Reorder lists of names in import statements alphabetically.
 # Default: false
