@@ -1,7 +1,8 @@
-use crate::Error;
 use libc::{getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, strlen, AF_INET, AF_INET6};
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+use crate::Error;
 
 /// `ifaddrs` struct raw pointer alias
 type IfAddrsPtr = *mut *mut ifaddrs;

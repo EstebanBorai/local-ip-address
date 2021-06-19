@@ -4,7 +4,7 @@
 //! Handy functions are provided such as `local_ip` which retrieve the local IP
 //! address based on the host system
 //!
-//! ```
+//! ```ignore
 //! use std::net::IpAddr;
 //! use local_ip_address::local_ip;
 //!
@@ -71,8 +71,10 @@ pub fn local_ip() -> Result<IpAddr, Error> {
 
     #[cfg(target_os = "macos")]
     const DEFAULT_IF_NAME: &str = "en0";
+
     #[cfg(target_os = "linux")]
     const DEFAULT_IF_NAME: &str = "wlp2s0";
+
     #[cfg(target_os = "windows")]
     const DEFAULT_IF_NAME: &str = "Ethernet";
 
@@ -81,4 +83,32 @@ pub fn local_ip() -> Result<IpAddr, Error> {
     }
 
     Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
+}
+
+mod tests {
+    #[allow(unused_imports)]
+    use super::*;
+
+    #[test]
+    fn find_local_ip() {
+        if cfg!(target_os = "macos") {
+            // local ip test is performed against macos as it is predecible to
+            // have the default interface name "en0" for `linux` or `windows`
+            // such ip address must be found using `find_af_inet`
+            let my_local_ip = local_ip().unwrap();
+
+            assert!(matches!(my_local_ip, IpAddr::V4(_)));
+            return;
+        }
+
+        assert!(true);
+    }
+
+    #[test]
+    fn find_network_interfaces() {
+        let network_interfaces = find_af_inet();
+
+        assert!(network_interfaces.is_ok());
+        assert!(network_interfaces.unwrap().len() >= 1);
+    }
 }
