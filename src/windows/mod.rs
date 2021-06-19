@@ -1,19 +1,40 @@
-use crate::Error;
-
-use bindings::Windows::Win32::NetworkManagement::IpHelper::{
-    GetAdaptersAddresses, ADDRESS_FAMILY, AF_INET, AF_INET6, AF_UNSPEC,
-    GET_ADAPTERS_ADDRESSES_FLAGS, IP_ADAPTER_ADDRESSES_LH,
+use bindings::Windows::Win32::{
+    NetworkManagement::IpHelper::{
+        ADDRESS_FAMILY, AF_INET, AF_INET6, AF_UNSPEC, GET_ADAPTERS_ADDRESSES_FLAGS,
+        IP_ADAPTER_ADDRESSES_LH, GetAdaptersAddresses,
+    },
+    Networking::WinSock::{SOCKADDR_IN, SOCKADDR_IN6},
+    System::Diagnostics::Debug::{ERROR_BUFFER_OVERFLOW, NO_ERROR},
 };
 
-use bindings::Windows::Win32::Networking::WinSock::{SOCKADDR_IN, SOCKADDR_IN6};
-use bindings::Windows::Win32::System::Diagnostics::Debug::{ERROR_BUFFER_OVERFLOW, NO_ERROR};
 use libc::{wchar_t, wcslen};
 use memalloc::{allocate, deallocate};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-pub fn impl_find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
+use crate::Error;
+
+/// Perform a search over the system's network interfaces using `getifaddrs`,
+/// retrieved network interfaces belonging to both socket address families
+/// `AF_INET` and `AF_INET6` are retrieved along with the interface address name.
+///
+/// # Example
+///
+/// ```
+/// use std::net::IpAddr;
+/// use local_ip_address::find_af_inet;
+///
+/// let ifas = find_af_inet().unwrap();
+///
+/// if let Some((_, ipaddr)) = ifas
+/// .iter()
+/// .find(|(name, ipaddr)| *name == "en0" && matches!(ipaddr, IpAddr::V4(_))) {
+///     // This is your local IP address: 192.168.1.111
+///     println!("This is your local IP address: {:?}", ipaddr);
+/// }
+/// ```
+pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
     let mut out: Vec<(String, IpAddr)> = Vec::new();
-    let mut dwsize: u32 = 1500;
+    let mut dwsize: u32 = 2000; //20kb should be enough to prevent realloc
 
     let mut mem = unsafe { allocate(dwsize as usize) } as *mut IP_ADAPTER_ADDRESSES_LH;
 
@@ -54,7 +75,6 @@ pub fn impl_find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
                     let a = unsafe { (*sockaddr).sin6_addr.u.Byte };
                     let ipv6 = Ipv6Addr::from(a);
                     let ip = IpAddr::V6(ipv6);
-                    //println!("ipv6 {}", ip);
                     let name = String::from_utf16(slice).unwrap();
                     out.push((name, ip));
                 } else if sockaddr.sa_family == AF_INET.0 as u16 {
