@@ -10,7 +10,7 @@ use bindings::Windows::Win32::NetworkManagement::IpHelper::{
 
 use crate::Error;
 
-/// Perform a search over the system's network interfaces using `getifaddrs`,
+/// Perform a search over the system's network interfaces using `GetAdaptersAddresses`,
 /// retrieved network interfaces belonging to both socket address families
 /// `AF_INET` and `AF_INET6` are retrieved along with the interface address name.
 ///
