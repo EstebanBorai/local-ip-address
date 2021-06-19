@@ -1,6 +1,9 @@
 <div>
   <h1 align="center">local-ip-address</h1>
-  <h4 align="center">Retrive system's local IP address</h4>
+  <h4 align="center">
+    Retrieve system's local IP address on Rust applications using `getifaddrs`
+    on Unix based systems and Win32's `GetAdaptersAddresses` on Windows
+  </h4>
 </div>
 
 <div align="center">
@@ -13,10 +16,23 @@
 
 </div>
 
-A wrapper on `getifaddrs` which retrieves host's
-network interfaces.
+A wrapper on `getifaddrs` for Unix based systems and `GetAdaptersAddresses` on
+Windows which retrieves host's network interfaces.
+
 Handy functions are provided such as `local_ip` which retrieve the local IP
 address based on the host system
+
+Is important to note that `local_ip` attempts to find commonly used network
+interface names on most of the systems. As of now only support for macOS and
+Windows is granted.
+
+Network interface names may change on different Linux distribution and hardware
+units. If your solution runs on different platforms its recommended to consume
+the `find_af_inet` function and search for the expected interface name instead
+of using `local_ip` directly.
+
+Help improve the support for multiple systems on this crate by opening a pull
+request or issue on [GitHub](https://github.com/EstebanBorai/local-ip-address).
 
 ```rust
 use std::net::IpAddr;
