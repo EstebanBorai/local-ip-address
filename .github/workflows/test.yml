@@ -1,4 +1,4 @@
-name: fmt
+name: test
 on:
   pull_request:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  fmt:
+  test:
     name: Runs "cargo test" on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
