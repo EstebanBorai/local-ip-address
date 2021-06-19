@@ -30,7 +30,6 @@
 //! }
 //! ```
 //!
-
 use std::string::FromUtf8Error;
 use std::{env, net::IpAddr};
 #[derive(thiserror::Error, Debug)]
@@ -53,6 +52,7 @@ pub enum Error {
 pub mod unix;
 #[cfg(target_family = "unix")]
 pub use crate::unix::*;
+
 #[cfg(target_family = "windows")]
 pub mod windows;
 #[cfg(target_family = "windows")]
