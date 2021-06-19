@@ -1,0 +1,21 @@
+[package]
+name = "local-ip-address-bindings"
+description = "Windows bindings for local-ip-address"
+version = "0.1.0"
+edition = "2018"
+authors = [
+  "nicguzzo <nicguzzo@gmail.com>",
+  "Esteban Borai <estebanborai@gmail>"
+]
+categories = ["web-programming"]
+repository = "https://github.com/EstebanBorai/local-ip-address"
+homepage = "https://github.com/EstebanBorai/local-ip-address"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
+windows = "0.11.0"
+
+[build-dependencies]
+windows = "0.11.0"
