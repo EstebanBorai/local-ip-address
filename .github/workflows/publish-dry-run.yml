@@ -1,0 +1,22 @@
+name: publish-dry-run
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  publish-dry-run:
+    name: "Runs cargo publish --dry-run"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+
+      - name: publish crate
+        run: cargo publish --dry-run

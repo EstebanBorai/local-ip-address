@@ -6,7 +6,7 @@ categories = ["web-programming"]
 homepage = "https://github.com/EstebanBorai/local-ip-address"
 keywords = ["local", "ip", "address", "web", "network"]
 license = "MIT OR Apache-2.0"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Esteban Borai <estebanborai@gmail.com>"]
 edition = "2018"
 readme = "README.md"
@@ -20,4 +20,4 @@ thiserror = "1"
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = "0.11.0"
 memalloc = "0.1"
-bindings = { package = "bindings", path = "src/windows/bindings" }
+bindings = { path = "src/windows/bindings" }

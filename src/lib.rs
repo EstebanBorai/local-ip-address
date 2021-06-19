@@ -1,37 +1,52 @@
-//! `local-ip-address` is a wrapper on `getifaddrs` which retrieves host's
-//! network interfaces.
-//!
-//! Handy functions are provided such as `local_ip` which retrieve the local IP
-//! address based on the host system
-//!
-//! ```ignore
-//! use std::net::IpAddr;
-//! use local_ip_address::local_ip;
-//!
-//! assert!(matches!(local_ip().unwrap(), IpAddr));
-//! ```
-//!
-//! You are able to iterate over a vector of tuples where the first element of
-//! the tuple is the name of the network interface and the second is the IP
-//! address.
-//!
-//! ```
-//! use std::net::IpAddr;
-//! use local_ip_address::find_af_inet;
-//!
-//! let ifas = find_af_inet().unwrap();
-//!
-//! if let Some((_, ipaddr)) = ifas
-//! .iter()
-//! .find(|(name, ipaddr)| *name == "en0" && matches!(ipaddr, IpAddr::V4(_))) {
-//!     println!("This is your local IP address: {:?}", ipaddr);
-//!     // This is your local IP address: 192.168.1.111
-//!     assert!(matches!(ipaddr, IpAddr));
-//! }
-//! ```
-//!
+/*!
+Retrieve system's local IP address on Rust applications using `getifaddrs`
+on Unix based systems and Win32's `GetAdaptersAddresses` on Windows
+
+A wrapper on `getifaddrs` for Unix based systems and `GetAdaptersAddresses` on
+Windows which retrieves host's network interfaces.
+
+Handy functions are provided such as `local_ip` which retrieve the local IP
+address based on the host system
+
+```ignore
+use std::net::IpAddr;
+use local_ip_address::local_ip;
+
+assert!(matches!(local_ip().unwrap(), IpAddr));
+```
+
+Is important to note that `local_ip` attempts to find commonly used network
+interface names on most of the systems. As of now only support for macOS and
+Windows is granted.
+
+Network interface names may change on different Linux distribution and hardware
+units. If your solution runs on different platforms its recommended to consume
+the `find_af_inet` function and search for the expected interface name instead
+of using `local_ip` directly.
+
+Help improve the support for multiple systems on this crate by opening a pull
+request or issue on [GitHub](https://github.com/EstebanBorai/local-ip-address).
+
+```
+use std::net::IpAddr;
+use local_ip_address::find_af_inet;
+
+let ifas = find_af_inet().unwrap();
+
+if let Some((_, ipaddr)) = ifas
+    .iter()
+    .find(|(name, ipaddr)| *name == "en0" && matches!(ipaddr, IpAddr::V4(_))) {
+    println!("This is your local IP address: {:?}", ipaddr);
+    // This is your local IP address: 192.168.1.111
+    assert!(matches!(ipaddr, IpAddr));
+}
+```
+
+*/
+use std::env;
+use std::net::IpAddr;
 use std::string::FromUtf8Error;
-use std::{env, net::IpAddr};
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     /// An error occured building a `&str` from a C string when
@@ -91,10 +106,16 @@ mod tests {
 
     #[test]
     fn find_local_ip() {
+        // Linux is not included in these tests as network interface names may
+        // differ based on distributions
         if cfg!(target_os = "macos") {
-            // local ip test is performed against macos as it is predecible to
-            // have the default interface name "en0" for `linux` or `windows`
-            // such ip address must be found using `find_af_inet`
+            let my_local_ip = local_ip().unwrap();
+
+            assert!(matches!(my_local_ip, IpAddr::V4(_)));
+            return;
+        }
+
+        if cfg!(target_os = "windows") {
             let my_local_ip = local_ip().unwrap();
 
             assert!(matches!(my_local_ip, IpAddr::V4(_)));
