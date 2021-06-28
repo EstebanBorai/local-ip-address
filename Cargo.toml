@@ -17,6 +17,9 @@ readme = "README.md"
 libc = "0.2"
 thiserror = "1"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+neli = "0.5"
+
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = "0.11.0"
 memalloc = "0.1"

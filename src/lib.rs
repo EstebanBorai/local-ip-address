@@ -27,7 +27,7 @@ of using `local_ip` directly.
 Help improve the support for multiple systems on this crate by opening a pull
 request or issue on [GitHub](https://github.com/EstebanBorai/local-ip-address).
 
-```
+```ignore
 use std::net::IpAddr;
 use local_ip_address::find_af_inet;
 
@@ -43,7 +43,6 @@ if let Some((_, ipaddr)) = ifas
 ```
 
 */
-use std::env;
 use std::net::IpAddr;
 use std::string::FromUtf8Error;
 
@@ -61,12 +60,23 @@ pub enum Error {
     PlatformNotSupported(String),
     #[error("GetIpAddrTableError")]
     GetAdaptersAddresses(u32),
+    #[error("Netlink IO Error `{0}`")]
+    NetlinkIOError(String),
+    #[error("Netlink: Socket Message Error `{0}`")]
+    NetlinkSendMessageError(String),
+    #[error("Netlink: Failed to find local IP address")]
+    NetlinkFailedToFindLocalIp,
 }
 
-#[cfg(target_family = "unix")]
-pub mod unix;
-#[cfg(target_family = "unix")]
-pub use crate::unix::*;
+#[cfg(target_os = "linux")]
+pub mod linux;
+#[cfg(target_os = "linux")]
+pub use crate::linux::*;
+
+#[cfg(target_os = "macos")]
+pub mod macos;
+#[cfg(target_os = "macos")]
+pub use crate::macos::*;
 
 #[cfg(target_family = "windows")]
 pub mod windows;
@@ -82,22 +92,38 @@ pub fn find_ifa(ifas: Vec<(String, IpAddr)>, ifa_name: &str) -> Option<(String, 
 
 /// Retrieves the local ip address for the current operative system
 pub fn local_ip() -> Result<IpAddr, Error> {
-    let ifas = find_af_inet()?;
-
-    #[cfg(target_os = "macos")]
-    const DEFAULT_IF_NAME: &str = "en0";
-
     #[cfg(target_os = "linux")]
-    const DEFAULT_IF_NAME: &str = "wlp2s0";
+    {
+        use crate::linux::local_ip;
 
-    #[cfg(target_os = "windows")]
-    const DEFAULT_IF_NAME: &str = "Ethernet";
-
-    if let Some((_, ipaddr)) = find_ifa(ifas, DEFAULT_IF_NAME) {
-        return Ok(ipaddr);
+        local_ip()
     }
 
-    Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
+    #[cfg(target_os = "macos")]
+    {
+        use std::env;
+
+        let ifas = crate::macos::find_af_inet()?;
+
+        if let Some((_, ipaddr)) = find_ifa(ifas, "en0") {
+            return Ok(ipaddr);
+        }
+
+        Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::env;
+
+        let ifas = find_af_inet()?;
+
+        if let Some((_, ipaddr)) = find_ifa(ifas, "Ethernet") {
+            return Ok(ipaddr);
+        }
+
+        Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
+    }
 }
 
 mod tests {
@@ -105,27 +131,35 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn find_local_ip() {
-        // Linux is not included in these tests as network interface names may
-        // differ based on distributions
-        if cfg!(target_os = "macos") {
-            let my_local_ip = local_ip().unwrap();
+        let my_local_ip = local_ip().unwrap();
 
-            assert!(matches!(my_local_ip, IpAddr::V4(_)));
-            return;
-        }
-
-        if cfg!(target_os = "windows") {
-            let my_local_ip = local_ip().unwrap();
-
-            assert!(matches!(my_local_ip, IpAddr::V4(_)));
-            return;
-        }
-
-        assert!(true);
+        assert!(matches!(my_local_ip, IpAddr::V4(_)));
+        println!("Linux 'local_ip': {:?}", my_local_ip);
     }
 
     #[test]
+    #[cfg(target_os = "macos")]
+    fn find_local_ip() {
+        let my_local_ip = local_ip().unwrap();
+
+        assert!(matches!(my_local_ip, IpAddr::V4(_)));
+        println!("macOS 'local_ip': {:?}", my_local_ip);
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn find_local_ip() {
+        let my_local_ip = local_ip().unwrap();
+
+        assert!(matches!(my_local_ip, IpAddr::V4(_)));
+        println!("Windows 'local_ip': {:?}", my_local_ip);
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    #[cfg(target_os = "windows")]
     fn find_network_interfaces() {
         let network_interfaces = find_af_inet();
 
