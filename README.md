@@ -1,8 +1,8 @@
 <div>
   <h1 align="center">local-ip-address</h1>
   <h4 align="center">
-    Retrieve system's local IP address on Rust applications using `getifaddrs`
-    on Unix based systems and Win32's `GetAdaptersAddresses` on Windows
+    Retrieve system's local IP address and Network Interfaces/Adapters on
+    Linux, macOS and Windows.
   </h4>
 </div>
 
@@ -16,49 +16,43 @@
 
 </div>
 
-A wrapper on `getifaddrs` for Unix based systems and `GetAdaptersAddresses` on
-Windows which retrieves host's network interfaces.
+## Usage
 
-Handy functions are provided such as `local_ip` which retrieve the local IP
-address based on the host system
-
-Is important to note that `local_ip` attempts to find commonly used network
-interface names on most of the systems. As of now only support for macOS and
-Windows is granted.
-
-Network interface names may change on different Linux distribution and hardware
-units. If your solution runs on different platforms its recommended to consume
-the `find_af_inet` function and search for the expected interface name instead
-of using `local_ip` directly.
-
-Help improve the support for multiple systems on this crate by opening a pull
-request or issue on [GitHub](https://github.com/EstebanBorai/local-ip-address).
+Get the local IP address of your system by executing the `local_ip` function:
 
 ```rust
-use std::net::IpAddr;
 use local_ip_address::local_ip;
 
-assert!(matches!(local_ip().unwrap(), IpAddr));
-```
+fn main() {
+    let my_local_ip = local_ip().unwrap();
 
-You are able to iterate over a vector of tuples where the first element of
-the tuple is the name of the network interface and the second is the IP
-address.
-
-```rust
-use std::net::IpAddr;
-use local_ip_address::find_af_inet;
-
-let ifas = find_af_inet().unwrap();
-
-if let Some((_, ipaddr)) = ifas
-.iter()
-.find(|(name, ipaddr)| *name == "en0" && matches!(ipaddr, IpAddr::V4(_))) {
-    println!("This is your local IP address: {:?}", ipaddr);
-    // This is your local IP address: 192.168.1.111
-    assert!(matches!(ipaddr, IpAddr));
+    println!("This is my local IP address: {:?}", my_local_ip);
 }
 ```
+
+Retrieve all the available network interfaces from both, the `AF_INET` and
+the `AF_INET6` family by executing the `list_afinet_netifas` function:
+
+```rust
+use local_ip_address::list_afinet_netifas;
+
+fn main() {
+    let network_interfaces = list_afinet_netifas().unwrap();
+
+    for (name, ip) in network_interfaces.iter() {
+        println!("{}:\t{:?}", name, ip);
+    }
+}
+```
+
+Underlying approach on retrieving network interfaces or the local IP address
+may differ based on the running operative system.
+
+OS | Approach
+--- | ---
+Linux | Establishes a Netlink socket interchange to retrieve network interfaces
+macOS | Uses of `getifaddrs` to retrieve network interfaces
+Windows | Consumes Win32 API's to retrieve the network adapters table
 
 ## Release
 
