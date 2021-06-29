@@ -1,71 +1,59 @@
 /*!
-Retrieve system's local IP address on Rust applications using `getifaddrs`
-on Unix based systems and Win32's `GetAdaptersAddresses` on Windows
+# Local IP Address
 
-A wrapper on `getifaddrs` for Unix based systems and `GetAdaptersAddresses` on
-Windows which retrieves host's network interfaces.
+Retrieve system's local IP address and Network Interfaces/Adapters on
+Linux, macOS and Windows.
 
-Handy functions are provided such as `local_ip` which retrieve the local IP
-address based on the host system
+## Usage
 
-```ignore
-use std::net::IpAddr;
+Get the local IP address of your system by executing the `local_ip` function:
+
+```rust
 use local_ip_address::local_ip;
 
-assert!(matches!(local_ip().unwrap(), IpAddr));
+let my_local_ip = local_ip().unwrap();
+
+println!("This is my local IP address: {:?}", my_local_ip);
 ```
 
-Is important to note that `local_ip` attempts to find commonly used network
-interface names on most of the systems. As of now only support for macOS and
-Windows is granted.
+Retrieve all the available network interfaces from both, the `AF_INET` and
+the `AF_INET6` family by executing the `list_afinet_netifas` function:
 
-Network interface names may change on different Linux distribution and hardware
-units. If your solution runs on different platforms its recommended to consume
-the `find_af_inet` function and search for the expected interface name instead
-of using `local_ip` directly.
+```rust
+use local_ip_address::list_afinet_netifas;
 
-Help improve the support for multiple systems on this crate by opening a pull
-request or issue on [GitHub](https://github.com/EstebanBorai/local-ip-address).
+let network_interfaces = list_afinet_netifas().unwrap();
 
-```ignore
-use std::net::IpAddr;
-use local_ip_address::find_af_inet;
-
-let ifas = find_af_inet().unwrap();
-
-if let Some((_, ipaddr)) = ifas
-    .iter()
-    .find(|(name, ipaddr)| *name == "en0" && matches!(ipaddr, IpAddr::V4(_))) {
-    println!("This is your local IP address: {:?}", ipaddr);
-    // This is your local IP address: 192.168.1.111
-    assert!(matches!(ipaddr, IpAddr));
+for (name, ip) in network_interfaces.iter() {
+    println!("{}:\t{:?}", name, ip);
 }
 ```
 
+Underlying approach on retrieving network interfaces or the local IP address
+may differ based on the running operative system.
+
+OS | Approach
+--- | ---
+Linux | Establishes a Netlink socket interchange to retrieve network interfaces
+macOS | Uses of `getifaddrs` to retrieve network interfaces
+Windows | Consumes Win32 API's to retrieve the network adapters table
+
 */
 use std::net::IpAddr;
-use std::string::FromUtf8Error;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    /// An error occured building a `&str` from a C string when
-    /// parsing the name of a interface address instance
-    #[error("Failed to read interface address name. `{0}`")]
-    IntAddrNameParseError(FromUtf8Error),
-    /// An error ocurred calling `getifaddrs`
-    #[error("Execution of getifaddrs had error result. getifaddrs returned `{0}`")]
-    GetIfAddrsError(i32),
-    /// The current platform is not supported
-    #[error("The current platform `{0}` is not supported")]
+    /// Returned when `local_ip` is unable to find the system's local IP address
+    /// in the collection of network interfaces
+    #[error("The Local IP Address wasn't available in the network interfaces list/table")]
+    LocalIpAddressNotFound,
+    /// Returned when an error occurs in the strategy level.
+    /// The error message may include any internal strategy error if available
+    #[error("An error ocurred executing the underlying strategy error.\n{0}")]
+    StrategyError(String),
+    /// Returned when the current platform is not yet supported
+    #[error("The current platform: `{0}`, is not suppported")]
     PlatformNotSupported(String),
-    #[error("GetIpAddrTableError")]
-    GetAdaptersAddresses(u32),
-    #[error("Netlink IO Error `{0}`")]
-    NetlinkIOError(String),
-    #[error("Netlink: Socket Message Error `{0}`")]
-    NetlinkSendMessageError(String),
-    #[error("Netlink: Failed to find local IP address")]
-    NetlinkFailedToFindLocalIp,
 }
 
 #[cfg(target_os = "linux")]
@@ -83,27 +71,29 @@ pub mod windows;
 #[cfg(target_family = "windows")]
 pub use crate::windows::*;
 
-/// Finds the network interface with the provided name in the vector of network
-/// interfaces provided
-pub fn find_ifa(ifas: Vec<(String, IpAddr)>, ifa_name: &str) -> Option<(String, IpAddr)> {
-    ifas.into_iter()
-        .find(|(name, ipaddr)| name == ifa_name && matches!(ipaddr, IpAddr::V4(_)))
-}
-
-/// Retrieves the local ip address for the current operative system
+/// Retrieves the local ip address of the machine in the local network from
+/// the `AF_INET` family.
+///
+/// A different approach is taken based on the operative system.
+///
+/// For linux based systems the Netlink socket communication is used to
+/// retrieve the local network interface.
+///
+/// For macOS systems the `getifaddrs` approach is taken using `libc`
+///
+/// For Windows systems Win32's IP Helper is used to gather the Local IP
+/// address
 pub fn local_ip() -> Result<IpAddr, Error> {
     #[cfg(target_os = "linux")]
     {
-        use crate::linux::local_ip;
-
-        local_ip()
+        crate::linux::local_ip()
     }
 
     #[cfg(target_os = "macos")]
     {
         use std::env;
 
-        let ifas = crate::macos::find_af_inet()?;
+        let ifas = crate::macos::list_afinet_netifas()?;
 
         if let Some((_, ipaddr)) = find_ifa(ifas, "en0") {
             return Ok(ipaddr);
@@ -116,7 +106,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
     {
         use std::env;
 
-        let ifas = find_af_inet()?;
+        let ifas = crate::windows::list_afinet_netifas()?;
 
         if let Some((_, ipaddr)) = find_ifa(ifas, "Ethernet") {
             return Ok(ipaddr);
@@ -124,6 +114,13 @@ pub fn local_ip() -> Result<IpAddr, Error> {
 
         Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
     }
+}
+
+/// Finds the network interface with the provided name in the vector of network
+/// interfaces provided
+pub fn find_ifa(ifas: Vec<(String, IpAddr)>, ifa_name: &str) -> Option<(String, IpAddr)> {
+    ifas.into_iter()
+        .find(|(name, ipaddr)| name == ifa_name && matches!(ipaddr, IpAddr::V4(_)))
 }
 
 mod tests {
@@ -158,10 +155,27 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
+    fn find_network_interfaces() {
+        let network_interfaces = list_afinet_netifas();
+
+        assert!(network_interfaces.is_ok());
+        assert!(network_interfaces.unwrap().len() >= 1);
+    }
+
+    #[test]
     #[cfg(target_os = "macos")]
+    fn find_network_interfaces() {
+        let network_interfaces = list_afinet_netifas();
+
+        assert!(network_interfaces.is_ok());
+        assert!(network_interfaces.unwrap().len() >= 1);
+    }
+
+    #[test]
     #[cfg(target_os = "windows")]
     fn find_network_interfaces() {
-        let network_interfaces = find_af_inet();
+        let network_interfaces = list_afinet_netifas();
 
         assert!(network_interfaces.is_ok());
         assert!(network_interfaces.unwrap().len() >= 1);

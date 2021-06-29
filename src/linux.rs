@@ -37,32 +37,39 @@ fn make_netlink_message(ifaddrmsg: NlPayload<Ifaddrmsg>) -> Nlmsghdr<Rtm, NlPayl
 /// Retrieves the local IP address fo this system
 pub fn local_ip() -> Result<IpAddr, Error> {
     let mut netlink_socket = NlSocketHandle::connect(NlFamily::Route, None, &[])
-        .map_err(|err| Error::NetlinkIOError(err.to_string()))?;
+        .map_err(|err| Error::StrategyError(err.to_string()))?;
     let ifaddrmsg = make_ifaddrmsg();
     let netlink_payload = NlPayload::Payload(ifaddrmsg);
     let netlink_message = make_netlink_message(netlink_payload);
 
     netlink_socket
         .send(netlink_message)
-        .map_err(|err| Error::NetlinkSendMessageError(err.to_string()))?;
+        .map_err(|err| Error::StrategyError(err.to_string()))?;
 
     let mut addrs = Vec::<Ipv4Addr>::with_capacity(1);
 
     for response in netlink_socket.iter(false) {
-        let header: Nlmsghdr<_, Ifaddrmsg> =
-            response.map_err(|_| Error::NetlinkFailedToFindLocalIp)?;
+        let header: Nlmsghdr<_, Ifaddrmsg> = response.map_err(|_| {
+            Error::StrategyError(String::from(
+                "An error ocurred retrieving Netlink's socket response",
+            ))
+        })?;
 
         if let NlPayload::Empty = header.nl_payload {
             continue;
         }
 
         if header.nl_type != Rtm::Newaddr.into() {
-            return Err(Error::NetlinkFailedToFindLocalIp);
+            return Err(Error::StrategyError(String::from(
+                "The Netlink header type is not the expected",
+            )));
         }
 
-        let p = header
-            .get_payload()
-            .map_err(|_| Error::NetlinkFailedToFindLocalIp)?;
+        let p = header.get_payload().map_err(|_| {
+            Error::StrategyError(String::from(
+                "An error ocurred getting Netlink's header payload",
+            ))
+        })?;
 
         if RtScope::from(p.ifa_scope) != RtScope::Universe {
             continue;
@@ -71,9 +78,11 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         for rtattr in p.rtattrs.iter() {
             if rtattr.rta_type == Ifa::Local {
                 addrs.push(Ipv4Addr::from(u32::from_be(
-                    rtattr
-                        .get_payload_as::<u32>()
-                        .map_err(|_| Error::NetlinkFailedToFindLocalIp)?,
+                    rtattr.get_payload_as::<u32>().map_err(|_| {
+                        Error::StrategyError(String::from(
+                            "An error ocurred retrieving Netlink's route payload attribute",
+                        ))
+                    })?,
                 )));
             }
         }
@@ -85,7 +94,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         return Ok(ipaddr);
     }
 
-    Err(Error::NetlinkFailedToFindLocalIp)
+    Err(Error::LocalIpAddressNotFound)
 }
 
 /// `ifaddrs` struct raw pointer alias
@@ -99,9 +108,9 @@ type IfAddrsPtr = *mut *mut ifaddrs;
 ///
 /// ```
 /// use std::net::IpAddr;
-/// use local_ip_address::find_af_inet;
+/// use local_ip_address::list_afinet_netifas;
 ///
-/// let ifas = find_af_inet().unwrap();
+/// let ifas = list_afinet_netifas().unwrap();
 ///
 /// if let Some((_, ipaddr)) = ifas
 /// .iter()
@@ -110,7 +119,7 @@ type IfAddrsPtr = *mut *mut ifaddrs;
 ///     println!("This is your local IP address: {:?}", ipaddr);
 /// }
 /// ```
-pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
+pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
     let ifaddrs_size = mem::size_of::<IfAddrsPtr>();
 
     unsafe {
@@ -119,7 +128,10 @@ pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
 
         if getifaddrs_result != 0 {
             // an error ocurred on getifaddrs
-            return Err(Error::GetIfAddrsError(getifaddrs_result));
+            return Err(Error::StrategyError(format!(
+                "GetIfAddrs returned error: {}",
+                getifaddrs_result
+            )));
         }
 
         let mut interfaces: Vec<(String, IpAddr)> = Vec::new();
@@ -189,6 +201,9 @@ unsafe fn get_ifa_name(ifa: *mut *mut ifaddrs) -> Result<String, Error> {
     let slice = std::slice::from_raw_parts(str, len);
     match String::from_utf8(slice.to_vec()) {
         Ok(s) => Ok(s),
-        Err(_e) => Err(Error::IntAddrNameParseError(_e)),
+        Err(e) => Err(Error::StrategyError(format!(
+            "Failed to retrieve interface name. The name is not a valid UTF-8 string. {}",
+            e.to_string()
+        ))),
     }
 }

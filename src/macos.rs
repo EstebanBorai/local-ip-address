@@ -15,9 +15,9 @@ type IfAddrsPtr = *mut *mut ifaddrs;
 ///
 /// ```
 /// use std::net::IpAddr;
-/// use local_ip_address::find_af_inet;
+/// use local_ip_address::list_afinet_netifas;
 ///
-/// let ifas = find_af_inet().unwrap();
+/// let ifas = list_afinet_netifas().unwrap();
 ///
 /// if let Some((_, ipaddr)) = ifas
 /// .iter()
@@ -26,7 +26,7 @@ type IfAddrsPtr = *mut *mut ifaddrs;
 ///     println!("This is your local IP address: {:?}", ipaddr);
 /// }
 /// ```
-pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
+pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
     let ifaddrs_size = mem::size_of::<IfAddrsPtr>();
 
     unsafe {
@@ -35,7 +35,10 @@ pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
 
         if getifaddrs_result != 0 {
             // an error ocurred on getifaddrs
-            return Err(Error::GetIfAddrsError(getifaddrs_result));
+            return Err(Error::StrategyError(format!(
+                "GetIfAddrs returned error: {}",
+                getifaddrs_result
+            )));
         }
 
         let mut interfaces: Vec<(String, IpAddr)> = Vec::new();
@@ -105,6 +108,9 @@ unsafe fn get_ifa_name(ifa: *mut *mut ifaddrs) -> Result<String, Error> {
     let slice = std::slice::from_raw_parts(str, len);
     match String::from_utf8(slice.to_vec()) {
         Ok(s) => Ok(s),
-        Err(_e) => Err(Error::IntAddrNameParseError(_e)),
+        Err(e) => Err(Error::StrategyError(format!(
+            "Failed to retrieve interface name. The name is not a valid UTF-8 string. {}",
+            e.to_string()
+        ))),
     }
 }

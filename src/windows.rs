@@ -21,9 +21,9 @@ use crate::Error;
 ///
 /// ```
 /// use std::net::IpAddr;
-/// use local_ip_address::find_af_inet;
+/// use local_ip_address::list_afinet_netifas;
 ///
-/// let ifas = find_af_inet().unwrap();
+/// let ifas = list_afinet_netifas().unwrap();
 ///
 /// if let Some((_, ipaddr)) = ifas
 /// .iter()
@@ -32,7 +32,7 @@ use crate::Error;
 ///     println!("This is your local IP address: {:?}", ipaddr);
 /// }
 /// ```
-pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
+pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
     const ERROR_BUFFER_OVERFLOW: u32 = 111;
     const NO_ERROR: u32 = 0;
     let mut out: Vec<(String, IpAddr)> = Vec::new();
@@ -108,7 +108,10 @@ pub fn find_af_inet() -> Result<Vec<(String, IpAddr)>, Error> {
             deallocate(mem as *mut u8, dwsize as usize);
         }
 
-        return Err(Error::GetAdaptersAddresses(ret_val));
+        return Err(Error::StrategyError(format!(
+            "Failed to get adapter addresses. Error: {}",
+            ret_val
+        )));
     }
 
     unsafe {

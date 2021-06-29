@@ -1,12 +1,12 @@
 [package]
 name = "local-ip-address"
-description = "Retrive system's local IP address"
+description = "Retrieve system's local IP address and Network Interfaces/Adapters on Linux, macOS and Windows."
 repository = "https://github.com/EstebanBorai/local-ip-address"
-categories = ["web-programming"]
+categories = ["web-programming", "network-programming"]
 homepage = "https://github.com/EstebanBorai/local-ip-address"
 keywords = ["local", "ip", "address", "web", "network"]
 license = "MIT OR Apache-2.0"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Esteban Borai <estebanborai@gmail.com>"]
 edition = "2018"
 readme = "README.md"
