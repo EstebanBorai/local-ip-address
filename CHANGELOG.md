@@ -2,6 +2,20 @@
 
 <Empty>
 
+<a name="v0.4.0"></a>
+## v0.4.0 (2021-06-29)
+
+> Requires Rust: rustc 1.52.1 (9bc8c42bb 2021-05-09)
+
+#### Features
+
+* Provide a Netlink based implementation for Linux
+
+* Rename methods to achieve a intuitive and easy to understand API
+  * `find_af_inet` to `find_af_inet`
+
+* Normalize errors through systems on calls to `local_ip`
+
 <a name="v0.3.0"></a>
 ## v0.3.0 (2021-06-18)
 
