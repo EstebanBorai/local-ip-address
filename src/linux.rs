@@ -195,10 +195,11 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
 }
 
 /// Retrieves the name of a interface address
-unsafe fn get_ifa_name(ifa: *mut *mut ifaddrs) -> Result<String, Error> {
-    let str = (*(*ifa)).ifa_name as *mut u8;
-    let len = strlen(str as *const i8);
-    let slice = std::slice::from_raw_parts(str, len);
+fn get_ifa_name(ifa: *mut *mut ifaddrs) -> Result<String, Error> {
+    let str = unsafe { (*(*ifa)).ifa_name as *const libc::c_char };
+    let len = unsafe { strlen(str) };
+    let slice = unsafe { std::slice::from_raw_parts(str as *const u8, len) };
+
     match String::from_utf8(slice.to_vec()) {
         Ok(s) => Ok(s),
         Err(e) => Err(Error::StrategyError(format!(
