@@ -2,6 +2,15 @@
 
 <Empty>
 
+<a name="v0.4.1"></a>
+## v0.4.1 (2021-07-06)
+
+> Requires Rust: rustc 1.52.1 (9bc8c42bb 2021-05-09)
+
+#### Fixes
+
+* Fixed compilation failure on Raspberry-Pi flavor Linux [Issue #10](https://github.com/EstebanBorai/local-ip-address/issues/10)
+
 <a name="v0.4.0"></a>
 ## v0.4.0 (2021-06-29)
 
