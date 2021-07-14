@@ -22,7 +22,7 @@ checksum = "12b8adadd720df158f4d70dfe7ccc6adb0472d7c55ca83445f6a5ab3e36f8fb6"
 
 [[package]]
 name = "local-ip-address"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "libc",
  "memalloc",

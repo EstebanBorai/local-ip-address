@@ -2,6 +2,15 @@
 
 <Empty>
 
+<a name="v0.4.2"></a>
+## v0.4.2 (2021-07-13)
+
+> Requires Rust: rustc 1.52.1 (9bc8c42bb 2021-05-09)
+
+#### Fixes
+
+* Fix missing author and year on Apache License
+
 <a name="v0.4.1"></a>
 ## v0.4.1 (2021-07-06)
 
