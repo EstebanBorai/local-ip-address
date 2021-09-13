@@ -108,7 +108,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
 
         let ifas = crate::windows::list_afinet_netifas()?;
 
-        if let Some((_, ipaddr)) = find_ifa(ifas, "Ethernet") {
+        if let Some((_, ipaddr)) = find_ifa(ifas, "lan") {
             return Ok(ipaddr);
         }
 

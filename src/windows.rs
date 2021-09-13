@@ -1,6 +1,7 @@
 mod bindings {
     windows::include_bindings!();
 }
+
 use libc::{wchar_t, wcslen};
 use memalloc::{allocate, deallocate};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -69,7 +70,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
         let mut cur = mem;
 
         while !cur.is_null() {
-            let fname = unsafe { (*cur).FriendlyName.0 };
+            let fname = unsafe { (*cur).DnsSuffix.0 };
             let len = unsafe { wcslen(fname as *const wchar_t) };
             let slice = unsafe { std::slice::from_raw_parts(fname, len) };
 
