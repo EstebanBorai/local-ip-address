@@ -1,13 +1,30 @@
+mod target;
+
+pub mod error;
+
 use network_interface::NetworkInterface;
 
 pub type Result = std::result::Result<NetworkInterface, Box<dyn std::error::Error>>;
 
 pub fn local_ip() -> Result {
+    #[cfg(target_os = "linux")]
+    {
+        use network_interface::NetworkInterfaceConfig;
+
+        let netifas = NetworkInterface::show()?;
+
+        if let Some(net_ifa) = netifas.iter().find(|net_ifa| net_ifa.name == "en0") {
+            return Ok(net_ifa.to_owned());
+        }
+
+        todo!()
+    }
+
     #[cfg(target_os = "macos")]
     {
         use network_interface::NetworkInterfaceConfig;
 
-        let netifas = NetworkInterface::show().unwrap();
+        let netifas = NetworkInterface::show()?;
 
         if let Some(net_ifa) = netifas.iter().find(|net_ifa| net_ifa.name == "en0") {
             return Ok(net_ifa.to_owned());

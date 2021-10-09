@@ -14,4 +14,8 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-network-interface = { path = "../network-interface" }
+network-interface = "0.1.2-beta"
+thiserror = "1.0.30"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+neli = "0.5.3"
