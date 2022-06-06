@@ -1,14 +1,12 @@
-mod bindings {
-    windows::include_bindings!();
-}
 use libc::{wchar_t, wcslen};
 use memalloc::{allocate, deallocate};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use bindings::Windows::Win32::Networking::WinSock::{SOCKADDR_IN, SOCKADDR_IN6};
-use bindings::Windows::Win32::NetworkManagement::IpHelper::{
-    ADDRESS_FAMILY, AF_INET, AF_INET6, AF_UNSPEC, GET_ADAPTERS_ADDRESSES_FLAGS,
-    IP_ADAPTER_ADDRESSES_LH, GetAdaptersAddresses,
+use windows::Win32::Networking::WinSock::{
+    ADDRESS_FAMILY, AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6,
+};
+use windows::Win32::NetworkManagement::IpHelper::{
+    GET_ADAPTERS_ADDRESSES_FLAGS, IP_ADAPTER_ADDRESSES_LH, GetAdaptersAddresses,
 };
 
 use crate::Error;
