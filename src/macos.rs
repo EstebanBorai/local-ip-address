@@ -110,7 +110,7 @@ unsafe fn get_ifa_name(ifa: *mut *mut ifaddrs) -> Result<String, Error> {
         Ok(s) => Ok(s),
         Err(e) => Err(Error::StrategyError(format!(
             "Failed to retrieve interface name. The name is not a valid UTF-8 string. {}",
-            e.to_string()
+            e
         ))),
     }
 }
