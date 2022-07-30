@@ -49,6 +49,7 @@ Thumbs.db
 # Cargo #
 #########
 /target
+Cargo.lock
 
 # Editor Files #
 ################

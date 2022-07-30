@@ -27,4 +27,4 @@ jobs:
           toolchain: stable
 
       - name: Build
-        run: cargo build --release --locked
+        run: cargo build --release
