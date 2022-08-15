@@ -4,7 +4,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use windows_sys::Win32::Networking::WinSock::{AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6};
 use windows_sys::Win32::NetworkManagement::IpHelper::{IP_ADAPTER_ADDRESSES_LH, GetAdaptersAddresses};
 
-use crate::Error;
+use crate::error::Error;
 
 /// Perform a search over the system's network interfaces using `GetAdaptersAddresses`,
 /// retrieved network interfaces belonging to both socket address families
