@@ -1,13 +1,8 @@
-use libc::{wchar_t, wcslen};
-use memalloc::{allocate, deallocate};
+use libc::{wchar_t, wcslen, malloc, free};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use windows::Win32::Networking::WinSock::{
-    ADDRESS_FAMILY, AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6,
-};
-use windows::Win32::NetworkManagement::IpHelper::{
-    GET_ADAPTERS_ADDRESSES_FLAGS, IP_ADAPTER_ADDRESSES_LH, GetAdaptersAddresses,
-};
+use windows_sys::Win32::Networking::WinSock::{AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6};
+use windows_sys::Win32::NetworkManagement::IpHelper::{IP_ADAPTER_ADDRESSES_LH, GetAdaptersAddresses};
 
 use crate::Error;
 
@@ -36,17 +31,15 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
     let mut out: Vec<(String, IpAddr)> = Vec::new();
     // 20kb should be enough to prevent realloc
     let mut dwsize: u32 = 2000;
-    let mut mem = unsafe { allocate(dwsize as usize) } as *mut IP_ADAPTER_ADDRESSES_LH;
+    let mut mem = unsafe { malloc(dwsize as usize) } as *mut IP_ADAPTER_ADDRESSES_LH;
     let mut n_tries = 3;
     let mut ret_val;
 
     loop {
-        let old_size = dwsize as usize;
-
         ret_val = unsafe {
             GetAdaptersAddresses(
-                ADDRESS_FAMILY(AF_UNSPEC.0),
-                GET_ADAPTERS_ADDRESSES_FLAGS(0x0),
+                AF_UNSPEC,
+                0,
                 std::ptr::null_mut::<std::ffi::c_void>(),
                 mem,
                 &mut dwsize,
@@ -57,9 +50,9 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
             break;
         }
 
-        unsafe { deallocate(mem as *mut u8, old_size as usize) };
+        unsafe { free(mem as *mut _) };
 
-        mem = unsafe { allocate(dwsize as usize) as *mut IP_ADAPTER_ADDRESSES_LH };
+        mem = unsafe { malloc(dwsize as usize) as *mut IP_ADAPTER_ADDRESSES_LH };
         n_tries -= 1;
     }
 
@@ -67,7 +60,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
         let mut cur = mem;
 
         while !cur.is_null() {
-            let fname = unsafe { (*cur).FriendlyName.0 };
+            let fname = unsafe { (*cur).FriendlyName };
             let len = unsafe { wcslen(fname as *const wchar_t) };
             let slice = unsafe { std::slice::from_raw_parts(fname, len) };
 
@@ -75,21 +68,18 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
             while !cur_a.is_null() {
                 let addr = unsafe { (*cur_a).Address };
                 let sockaddr = unsafe { *addr.lpSockaddr };
-                if sockaddr.sa_family == AF_INET6.0 as u16 {
+                let socket_address_family = u32::from(sockaddr.sa_family);
+                if socket_address_family == AF_INET6 {
                     let sockaddr: *mut SOCKADDR_IN6 = addr.lpSockaddr as *mut SOCKADDR_IN6;
                     let a = unsafe { (*sockaddr).sin6_addr.u.Byte };
                     let ipv6 = Ipv6Addr::from(a);
                     let ip = IpAddr::V6(ipv6);
                     let name = String::from_utf16(slice).unwrap();
                     out.push((name, ip));
-                } else if sockaddr.sa_family == AF_INET.0 as u16 {
+                } else if socket_address_family == AF_INET {
                     let sockaddr: *mut SOCKADDR_IN = addr.lpSockaddr as *mut SOCKADDR_IN;
                     let a = unsafe { (*sockaddr).sin_addr.S_un.S_addr };
-                    let ipv4 = if cfg!(target_endian = "little") {
-                        Ipv4Addr::from(a.swap_bytes())
-                    } else {
-                        Ipv4Addr::from(a)
-                    };
+                    let ipv4 = Ipv4Addr::from(a);
 
                     let ip = IpAddr::V4(ipv4);
                     let name = String::from_utf16(slice).unwrap();
@@ -103,7 +93,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
         }
     } else {
         unsafe {
-            deallocate(mem as *mut u8, dwsize as usize);
+            free(mem as *mut _);
         }
 
         return Err(Error::StrategyError(format!(
@@ -113,7 +103,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
     }
 
     unsafe {
-        deallocate(mem as *mut u8, dwsize as usize);
+        free(mem as *mut _);
     }
 
     Ok(out)
