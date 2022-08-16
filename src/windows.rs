@@ -138,7 +138,7 @@ fn get_ip_forward_table(order: BOOL) -> Result<ReadonlyResource<MIB_IPFORWARDTAB
 
     loop {
         let ip_forward_table =
-            match NonNull::new(unsafe { malloc(size as usize) as *mut MIB_IPFORWARDTABLE }) {
+            match NonNull::new(unsafe { malloc(size.try_into().unwrap()).cast() }) {
                 // Wrapping it in ReadonlyResource will automatically free the memory upon drop.
                 Some(ptr) => ReadonlyResource(ptr),
                 None => return Err(ERROR_NOT_ENOUGH_MEMORY),
@@ -173,7 +173,7 @@ fn get_adapter_addresses(
 
     loop {
         let adapter_addresses =
-            match NonNull::new(unsafe { malloc(size as usize) as *mut IP_ADAPTER_ADDRESSES_LH }) {
+            match NonNull::new(unsafe { malloc(size.try_into().unwrap()).cast() }) {
                 // Wrapping it in ReadonlyResource will automatically free the memory upon drop.
                 Some(ptr) => ReadonlyResource(ptr),
                 None => return Err(ERROR_NOT_ENOUGH_MEMORY),
@@ -287,7 +287,7 @@ impl<T> Deref for ReadonlyResource<T> {
 impl<T> Drop for ReadonlyResource<T> {
     fn drop(&mut self) {
         unsafe {
-            free(self.0.as_ptr() as *mut _);
+            free(self.0.as_ptr().cast());
         }
     }
 }
