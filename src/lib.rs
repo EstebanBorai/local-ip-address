@@ -93,15 +93,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
 
     #[cfg(target_os = "windows")]
     {
-        use std::env;
-
-        let ifas = crate::windows::list_afinet_netifas()?;
-
-        if let Some((_, ipaddr)) = find_ifa(ifas, "Ethernet") {
-            return Ok(ipaddr);
-        }
-
-        Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
+        crate::windows::local_ip()
     }
 }
 
