@@ -19,7 +19,7 @@ use windows_sys::Win32::{
         IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_UNICAST_ADDRESS_LH, MIB_IPFORWARDTABLE,
     },
     Networking::WinSock::{
-        ADDRESS_FAMILY, AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6,
+        ADDRESS_FAMILY, AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR,
     },
     System::{
         Diagnostics::Debug::{
@@ -31,12 +31,13 @@ use windows_sys::Win32::{
 
 use crate::error::Error;
 
-/// Retrieves the local ip address for this system.
-pub fn local_ip() -> Result<IpAddr, Error> {
+/// Retrieves the local ip addresses for this system.
+pub(crate) fn list_local_ip_addresses(family: ADDRESS_FAMILY) -> Result<Vec<IpAddr>, Error> {
     /// An IPv4 address of 0.0.0.0 in the dwForwardDest member of the MIB_IPFORWARDROW structure is considered a
     /// default route.
     const DEFAULT_ROUTE: u32 = 0;
 
+    // There can be multiple default routes (e.g. wifi and ethernet).
     let default_route_interface_indices: Vec<u32> = {
         let ip_forward_table = get_ip_forward_table(0).map_err(|error| match error {
             ERROR_NO_DATA | ERROR_NOT_SUPPORTED => Error::LocalIpAddressNotFound,
@@ -56,8 +57,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
             .collect()
     };
 
-    // We only need to query for IPv4 addresses.
-    let adapter_addresses = get_adapter_addresses(AF_INET, 0).map_err(|error| match error {
+    let adapter_addresses = get_adapter_addresses(family, 0).map_err(|error| match error {
         ERROR_ADDRESS_NOT_ASSOCIATED | ERROR_NO_DATA => Error::LocalIpAddressNotFound,
         error_code => Error::StrategyError(format_error_code(error_code)),
     })?;
@@ -68,27 +68,18 @@ pub fn local_ip() -> Result<IpAddr, Error> {
             let interface_index = unsafe { adapter_address.Anonymous1.Anonymous.IfIndex };
             default_route_interface_indices.contains(&interface_index)
         })
-        .find_map(|default_adapter_address| {
-            let mut unicast_addresses_iter =
+        .flat_map(|default_adapter_address| {
+            let unicast_addresses_iter =
                 LinkedListIter::new(NonNull::new(default_adapter_address.FirstUnicastAddress));
 
-            unicast_addresses_iter.find_map(|unicast_address| {
+            unicast_addresses_iter.filter_map(|unicast_address| {
                 let socket_address = NonNull::new(unicast_address.Address.lpSockaddr)?;
-
-                let socket_address_family = u32::from(unsafe { socket_address.as_ref().sa_family });
-
-                if socket_address_family == AF_INET {
-                    let socket_address = unsafe { socket_address.cast::<SOCKADDR_IN>().as_ref() };
-                    let address = unsafe { socket_address.sin_addr.S_un.S_addr };
-                    let ipv4_address = IpAddr::from(address.to_ne_bytes());
-                    Some(ipv4_address)
-                } else {
-                    None
-                }
+                get_ip_address_from_socket_address(socket_address)
             })
-        });
+        })
+        .collect();
 
-    local_ip_address.ok_or(Error::LocalIpAddressNotFound)
+    Ok(local_ip_address)
 }
 
 /// Perform a search over the system's network interfaces using `GetAdaptersAddresses`,
@@ -127,24 +118,8 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
 
             unicast_addresses_iter.filter_map(|unicast_address| {
                 let socket_address = NonNull::new(unicast_address.Address.lpSockaddr)?;
-
-                let socket_address_family = u32::from(unsafe { socket_address.as_ref().sa_family });
-
-                if socket_address_family == AF_INET {
-                    let socket_address = unsafe { socket_address.cast::<SOCKADDR_IN>().as_ref() };
-                    let address = unsafe { socket_address.sin_addr.S_un.S_addr };
-                    let ipv4_address = IpAddr::from(address.to_ne_bytes());
-                    let name = String::from_utf16_lossy(friendly_name);
-                    Some((name, ipv4_address))
-                } else if socket_address_family == AF_INET6 {
-                    let socket_address = unsafe { socket_address.cast::<SOCKADDR_IN6>().as_ref() };
-                    let address = unsafe { socket_address.sin6_addr.u.Byte };
-                    let ipv6_address = IpAddr::from(address);
-                    let name = String::from_utf16_lossy(friendly_name);
-                    Some((name, ipv6_address))
-                } else {
-                    None
-                }
+                get_ip_address_from_socket_address(socket_address)
+                    .map(|ip_address| (String::from_utf16_lossy(friendly_name), ip_address))
             })
         })
         .collect();
@@ -188,7 +163,7 @@ fn get_ip_forward_table(order: BOOL) -> Result<ReadonlyResource<MIB_IPFORWARDTAB
 ///
 /// [GetAdaptersAddresses]: https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
 fn get_adapter_addresses(
-    address_family: ADDRESS_FAMILY,
+    family: ADDRESS_FAMILY,
     flags: GET_ADAPTERS_ADDRESSES_FLAGS,
 ) -> Result<ReadonlyResource<IP_ADAPTER_ADDRESSES_LH>, WIN32_ERROR> {
     // The recommended buffer size is 15kb.
@@ -206,7 +181,7 @@ fn get_adapter_addresses(
 
         let result = unsafe {
             GetAdaptersAddresses(
-                address_family,
+                family,
                 flags,
                 ptr::null_mut(),
                 adapter_addresses.0.as_ptr(),
@@ -227,39 +202,26 @@ fn get_adapter_addresses(
     }
 }
 
-/// Wrapper type around a pointer to a Windows API structure.
-///
-/// This type ensures that the memory allocated is freed automatically and fields are not overwritten.
-struct ReadonlyResource<T>(NonNull<T>);
+/// Converts a Windows socket address to an ip address.
+fn get_ip_address_from_socket_address(socket_address: NonNull<SOCKADDR>) -> Option<IpAddr> {
+    let socket_address_family = u32::from(unsafe { socket_address.as_ref().sa_family });
 
-impl<T> Deref for ReadonlyResource<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { self.0.as_ref() }
+    if socket_address_family == AF_INET {
+        let socket_address = unsafe { socket_address.cast::<SOCKADDR_IN>().as_ref() };
+        let address = unsafe { socket_address.sin_addr.S_un.S_addr };
+        let ipv4_address = IpAddr::from(address.to_ne_bytes());
+        Some(ipv4_address)
+    } else if socket_address_family == AF_INET6 {
+        let socket_address = unsafe { socket_address.cast::<SOCKADDR_IN6>().as_ref() };
+        let address = unsafe { socket_address.sin6_addr.u.Byte };
+        let ipv6_address = IpAddr::from(address);
+        Some(ipv6_address)
+    } else {
+        None
     }
 }
 
-impl<T> Drop for ReadonlyResource<T> {
-    fn drop(&mut self) {
-        unsafe {
-            free(self.0.as_ptr() as *mut _);
-        }
-    }
-}
-
-impl LinkedListIterator for IP_ADAPTER_ADDRESSES_LH {
-    fn next(&self) -> Option<NonNull<Self>> {
-        NonNull::new(self.Next)
-    }
-}
-
-impl LinkedListIterator for IP_ADAPTER_UNICAST_ADDRESS_LH {
-    fn next(&self) -> Option<NonNull<Self>> {
-        NonNull::new(self.Next)
-    }
-}
-
+/// Formats a Windows API error code to a localized error message.
 // Based on the example in https://docs.microsoft.com/en-us/globalization/localizability/win32-formatmessage.
 fn format_error_code(error_code: WIN32_ERROR) -> String {
     let mut wide_ptr = ptr::null_mut::<u16>();
@@ -293,6 +255,11 @@ fn format_error_code(error_code: WIN32_ERROR) -> String {
     error_message
 }
 
+/// Wrapper type around a pointer to a Windows API structure.
+///
+/// This type ensures that the memory allocated is freed automatically and fields are not overwritten.
+struct ReadonlyResource<T>(NonNull<T>);
+
 /// A trait to allow low level linked list data structures to be used as Rust iterators.
 ///
 /// The networking data structures often contain linked lists, which (unfortunately) are a separate types with
@@ -307,6 +274,34 @@ trait LinkedListIterator {
 struct LinkedListIter<'linked_list, T: LinkedListIterator> {
     node: Option<NonNull<T>>,
     __phantom_lifetime: PhantomData<&'linked_list T>,
+}
+
+impl<T> Deref for ReadonlyResource<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.0.as_ref() }
+    }
+}
+
+impl<T> Drop for ReadonlyResource<T> {
+    fn drop(&mut self) {
+        unsafe {
+            free(self.0.as_ptr() as *mut _);
+        }
+    }
+}
+
+impl LinkedListIterator for IP_ADAPTER_ADDRESSES_LH {
+    fn next(&self) -> Option<NonNull<Self>> {
+        NonNull::new(self.Next)
+    }
+}
+
+impl LinkedListIterator for IP_ADAPTER_UNICAST_ADDRESS_LH {
+    fn next(&self) -> Option<NonNull<Self>> {
+        NonNull::new(self.Next)
+    }
 }
 
 impl<'linked_list, T: LinkedListIterator> LinkedListIter<'linked_list, T> {

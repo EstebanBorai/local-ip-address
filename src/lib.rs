@@ -93,7 +93,16 @@ pub fn local_ip() -> Result<IpAddr, Error> {
 
     #[cfg(target_os = "windows")]
     {
-        crate::windows::local_ip()
+        use std::env;
+
+        use windows_sys::Win32::Networking::WinSock::AF_INET;
+
+        let ip_addresses = crate::windows::list_local_ip_addresses(AF_INET)?;
+
+        ip_addresses
+            .into_iter()
+            .find(|ip_address| matches!(ip_address, IpAddr::V4(_)))
+            .ok_or_else(|| Error::PlatformNotSupported(env::consts::OS.to_string()))
     }
 }
 
