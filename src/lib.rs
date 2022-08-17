@@ -41,20 +41,9 @@ Windows | Consumes Win32 API's to retrieve the network adapters table
 */
 use std::net::IpAddr;
 
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    /// Returned when `local_ip` is unable to find the system's local IP address
-    /// in the collection of network interfaces
-    #[error("The Local IP Address wasn't available in the network interfaces list/table")]
-    LocalIpAddressNotFound,
-    /// Returned when an error occurs in the strategy level.
-    /// The error message may include any internal strategy error if available
-    #[error("An error ocurred executing the underlying strategy error.\n{0}")]
-    StrategyError(String),
-    /// Returned when the current platform is not yet supported
-    #[error("The current platform: `{0}`, is not suppported")]
-    PlatformNotSupported(String),
-}
+mod error;
+
+pub use error::Error;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
@@ -106,13 +95,14 @@ pub fn local_ip() -> Result<IpAddr, Error> {
     {
         use std::env;
 
-        let ifas = crate::windows::list_afinet_netifas()?;
+        use windows_sys::Win32::Networking::WinSock::AF_INET;
 
-        if let Some((_, ipaddr)) = find_ifa(ifas, "Ethernet") {
-            return Ok(ipaddr);
-        }
+        let ip_addresses = crate::windows::list_local_ip_addresses(AF_INET)?;
 
-        Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
+        ip_addresses
+            .into_iter()
+            .find(|ip_address| matches!(ip_address, IpAddr::V4(_)))
+            .ok_or_else(|| Error::PlatformNotSupported(env::consts::OS.to_string()))
     }
 }
 
