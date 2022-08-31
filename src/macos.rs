@@ -1,4 +1,5 @@
 use libc::{getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, strlen, AF_INET, AF_INET6};
+use std::alloc::{alloc, dealloc, Layout};
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
@@ -27,10 +28,9 @@ type IfAddrsPtr = *mut *mut ifaddrs;
 /// }
 /// ```
 pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
-    let ifaddrs_size = mem::size_of::<IfAddrsPtr>();
-
     unsafe {
-        let myaddr: IfAddrsPtr = libc::malloc(ifaddrs_size) as IfAddrsPtr;
+        let layout = Layout::new::<IfAddrsPtr>();
+        let myaddr: IfAddrsPtr = alloc(layout) as IfAddrsPtr;
         let getifaddrs_result = getifaddrs(myaddr);
 
         if getifaddrs_result != 0 {
