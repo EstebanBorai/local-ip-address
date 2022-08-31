@@ -30,7 +30,8 @@ type IfAddrsPtr = *mut *mut ifaddrs;
 pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
     unsafe {
         let layout = Layout::new::<IfAddrsPtr>();
-        let myaddr: IfAddrsPtr = alloc(layout) as IfAddrsPtr;
+        let ptr = alloc(layout);
+        let myaddr = ptr as IfAddrsPtr;
         let getifaddrs_result = getifaddrs(myaddr);
 
         if getifaddrs_result != 0 {
@@ -97,6 +98,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
             }
         }
 
+        dealloc(ptr, layout);
         Ok(interfaces)
     }
 }
