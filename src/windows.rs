@@ -1,4 +1,5 @@
 use std::{
+    alloc::{alloc, dealloc, Layout},
     net::IpAddr,
     ptr::{NonNull, self},
     slice,
@@ -7,7 +8,6 @@ use std::{
     mem,
 };
 
-use libc::{wcslen, malloc, free};
 use windows_sys::Win32::{
     Foundation::{
         GetLastError, BOOL, ERROR_ADDRESS_NOT_ASSOCIATED, ERROR_BUFFER_OVERFLOW,
@@ -61,7 +61,7 @@ pub(crate) fn list_local_ip_addresses(family: ADDRESS_FAMILY) -> Result<Vec<IpAd
         ERROR_ADDRESS_NOT_ASSOCIATED | ERROR_NO_DATA => Error::LocalIpAddressNotFound,
         error_code => Error::StrategyError(format_error_code(error_code)),
     })?;
-    let adapter_addresses_iter = LinkedListIter::new(Some(adapter_addresses.0));
+    let adapter_addresses_iter = LinkedListIter::new(Some(adapter_addresses.ptr));
 
     let local_ip_address = adapter_addresses_iter
         .filter(|adapter_address| {
@@ -104,17 +104,24 @@ pub(crate) fn list_local_ip_addresses(family: ADDRESS_FAMILY) -> Result<Vec<IpAd
 pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
     let adapter_addresses = get_adapter_addresses(AF_UNSPEC, 0)
         .map_err(|error_code| Error::StrategyError(format_error_code(error_code)))?;
-    let adapter_addresses_iter = LinkedListIter::new(Some(adapter_addresses.0));
+    let adapter_addresses_iter = LinkedListIter::new(Some(adapter_addresses.ptr));
 
     let network_interfaces = adapter_addresses_iter
         .flat_map(|adapter_address| {
             let unicast_addresses_iter =
                 LinkedListIter::new(NonNull::new(adapter_address.FirstUnicastAddress));
 
-            let friendly_name = unsafe {
-                let len = wcslen(adapter_address.FriendlyName);
-                slice::from_raw_parts(adapter_address.FriendlyName, len)
+            let len = unsafe {
+                let mut ptr = adapter_address.FriendlyName;
+                while *ptr != 0 {
+                    ptr = ptr.offset(1);
+                }
+                ptr.offset_from(adapter_address.FriendlyName)
+                    .try_into()
+                    .unwrap()
             };
+
+            let friendly_name = unsafe { slice::from_raw_parts(adapter_address.FriendlyName, len) };
 
             unicast_addresses_iter.filter_map(|unicast_address| {
                 let socket_address = NonNull::new(unicast_address.Address.lpSockaddr)?;
@@ -138,13 +145,9 @@ fn get_ip_forward_table(order: BOOL) -> Result<ReadonlyResource<MIB_IPFORWARDTAB
 
     loop {
         let ip_forward_table =
-            match NonNull::new(unsafe { malloc(size.try_into().unwrap()).cast() }) {
-                // Wrapping it in ReadonlyResource will automatically free the memory upon drop.
-                Some(ptr) => ReadonlyResource(ptr),
-                None => return Err(ERROR_NOT_ENOUGH_MEMORY),
-            };
+            ReadonlyResource::new(size.try_into().unwrap()).ok_or(ERROR_NOT_ENOUGH_MEMORY)?;
 
-        let result = unsafe { GetIpForwardTable(ip_forward_table.0.as_ptr(), &mut size, order) };
+        let result = unsafe { GetIpForwardTable(ip_forward_table.ptr.as_ptr(), &mut size, order) };
 
         break match result {
             ERROR_SUCCESS => Ok(ip_forward_table),
@@ -173,18 +176,14 @@ fn get_adapter_addresses(
 
     loop {
         let adapter_addresses =
-            match NonNull::new(unsafe { malloc(size.try_into().unwrap()).cast() }) {
-                // Wrapping it in ReadonlyResource will automatically free the memory upon drop.
-                Some(ptr) => ReadonlyResource(ptr),
-                None => return Err(ERROR_NOT_ENOUGH_MEMORY),
-            };
+            ReadonlyResource::new(size.try_into().unwrap()).ok_or(ERROR_NOT_ENOUGH_MEMORY)?;
 
         let result = unsafe {
             GetAdaptersAddresses(
                 family,
                 flags,
                 ptr::null_mut(),
-                adapter_addresses.0.as_ptr(),
+                adapter_addresses.ptr.as_ptr(),
                 &mut size,
             )
         };
@@ -258,7 +257,10 @@ fn format_error_code(error_code: WIN32_ERROR) -> String {
 /// Wrapper type around a pointer to a Windows API structure.
 ///
 /// This type ensures that the memory allocated is freed automatically and fields are not overwritten.
-struct ReadonlyResource<T>(NonNull<T>);
+struct ReadonlyResource<T> {
+    ptr: NonNull<T>,
+    layout: Layout,
+}
 
 /// A trait to allow low level linked list data structures to be used as Rust iterators.
 ///
@@ -276,18 +278,29 @@ struct LinkedListIter<'linked_list, T: LinkedListIterator> {
     __phantom_lifetime: PhantomData<&'linked_list T>,
 }
 
+impl<T> ReadonlyResource<T> {
+    fn new(size: usize) -> Option<ReadonlyResource<T>> {
+        let layout = Layout::from_size_align(size, mem::align_of::<T>()).ok()?;
+
+        match NonNull::new(unsafe { alloc(layout).cast() }) {
+            Some(ptr) => Some(ReadonlyResource { ptr, layout }),
+            None => None,
+        }
+    }
+}
+
 impl<T> Deref for ReadonlyResource<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { self.0.as_ref() }
+        unsafe { self.ptr.as_ref() }
     }
 }
 
 impl<T> Drop for ReadonlyResource<T> {
     fn drop(&mut self) {
         unsafe {
-            free(self.0.as_ptr().cast());
+            dealloc(self.ptr.as_ptr().cast(), self.layout);
         }
     }
 }
