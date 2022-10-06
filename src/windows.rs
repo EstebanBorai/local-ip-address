@@ -111,17 +111,23 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
             let unicast_addresses_iter =
                 LinkedListIter::new(NonNull::new(adapter_address.FirstUnicastAddress));
 
-            let len = unsafe {
-                let mut ptr = adapter_address.FriendlyName;
-                while *ptr != 0 {
-                    ptr = ptr.offset(1);
-                }
-                ptr.offset_from(adapter_address.FriendlyName)
-                    .try_into()
-                    .unwrap()
-            };
+            let friendly_name = unsafe {
+                #[allow(unused_unsafe)]
+                // SAFETY: This is basically how `wcslen` works under the hood. `wcslen` is unsafe because the pointer
+                // is not checked for null and if there is no null-terminating character, it will run forever.
+                // Therefore, safety relies on the operating sysytem always returning a valid string.
+                let len = unsafe {
+                    let mut ptr = adapter_address.FriendlyName;
+                    while *ptr != 0 {
+                        ptr = ptr.offset(1);
+                    }
+                    ptr.offset_from(adapter_address.FriendlyName)
+                        .try_into()
+                        .unwrap()
+                };
 
-            let friendly_name = unsafe { slice::from_raw_parts(adapter_address.FriendlyName, len) };
+                slice::from_raw_parts(adapter_address.FriendlyName, len)
+            };
 
             unicast_addresses_iter.filter_map(|unicast_address| {
                 let socket_address = NonNull::new(unicast_address.Address.lpSockaddr)?;
@@ -281,11 +287,8 @@ struct LinkedListIter<'linked_list, T: LinkedListIterator> {
 impl<T> ReadonlyResource<T> {
     fn new(size: usize) -> Option<ReadonlyResource<T>> {
         let layout = Layout::from_size_align(size, mem::align_of::<T>()).ok()?;
-
-        match NonNull::new(unsafe { alloc(layout).cast() }) {
-            Some(ptr) => Some(ReadonlyResource { ptr, layout }),
-            None => None,
-        }
+        let ptr = NonNull::new(unsafe { alloc(layout).cast() })?;
+        Some(ReadonlyResource { ptr, layout })
     }
 }
 
