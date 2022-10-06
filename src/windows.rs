@@ -53,7 +53,13 @@ pub(crate) fn list_local_ip_addresses(family: ADDRESS_FAMILY) -> Result<Vec<IpAd
 
         table
             .iter()
-            .filter_map(|row| (row.dwForwardDest == DEFAULT_ROUTE).then(|| row.dwForwardIfIndex))
+            .filter_map(|row| {
+                if row.dwForwardDest == DEFAULT_ROUTE {
+                    Some(row.dwForwardIfIndex)
+                } else {
+                    None
+                }
+            })
             .collect()
     };
 
