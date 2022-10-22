@@ -50,9 +50,9 @@ pub mod linux;
 #[cfg(target_os = "linux")]
 pub use crate::linux::*;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos",target_os = "openbsd"))]
 pub mod macos;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos",target_os = "openbsd"))]
 pub use crate::macos::*;
 
 #[cfg(target_family = "windows")]
@@ -78,7 +78,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         crate::linux::local_ip()
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos",target_os = "openbsd"))]
     {
         use std::env;
 
