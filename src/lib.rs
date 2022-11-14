@@ -52,7 +52,7 @@ pub use crate::linux::*;
 
 #[cfg(any(target_os = "macos", target_os = "openbsd"))]
 pub mod macos;
-#[cfg(any(target_os = "macos",target_os = "openbsd"))]
+#[cfg(any(target_os = "macos", target_os = "openbsd"))]
 pub use crate::macos::*;
 
 #[cfg(target_family = "windows")]
