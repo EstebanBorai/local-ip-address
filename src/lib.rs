@@ -78,7 +78,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         crate::linux::local_ip()
     }
 
-    #[cfg(any(target_os = "macos",target_os = "openbsd"))]
+    #[cfg(any(target_os = "macos", target_os = "openbsd"))]
     {
         use std::env;
 
