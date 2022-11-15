@@ -2,7 +2,7 @@
 # Local IP Address
 
 Retrieve system's local IP address and Network Interfaces/Adapters on
-Linux, macOS and Windows.
+Linux, macOS, OpenBSD, and Windows.
 
 ## Usage
 
@@ -35,7 +35,7 @@ may differ based on the running operative system.
 OS | Approach
 --- | ---
 Linux | Establishes a Netlink socket interchange to retrieve network interfaces
-macOS | Uses of `getifaddrs` to retrieve network interfaces
+macOS, OpenBSD | Uses of `getifaddrs` to retrieve network interfaces
 Windows | Consumes Win32 API's to retrieve the network adapters table
 
 */
@@ -51,9 +51,9 @@ pub mod linux;
 pub use crate::linux::*;
 
 #[cfg(any(target_os = "macos", target_os = "openbsd"))]
-pub mod macos;
+pub mod bsd;
 #[cfg(any(target_os = "macos", target_os = "openbsd"))]
-pub use crate::macos::*;
+pub use crate::bsd::*;
 
 #[cfg(target_family = "windows")]
 pub mod windows;
@@ -68,7 +68,7 @@ pub use crate::windows::*;
 /// For linux based systems the Netlink socket communication is used to
 /// retrieve the local network interface.
 ///
-/// For macOS systems the `getifaddrs` approach is taken using `libc`
+/// For BSD-based systems the `getifaddrs` approach is taken using `libc`
 ///
 /// For Windows systems Win32's IP Helper is used to gather the Local IP
 /// address
@@ -82,7 +82,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
     {
         use std::env;
 
-        let ifas = crate::macos::list_afinet_netifas()?;
+        let ifas = crate::bsd::list_afinet_netifas()?;
 
         if let Some((_, ipaddr)) = find_ifa(ifas, "en0") {
             return Ok(ipaddr);
