@@ -2,7 +2,7 @@
   <h1 align="center">local-ip-address</h1>
   <h4 align="center">
     Retrieve system's local IP address and Network Interfaces/Adapters on
-    Linux, macOS and Windows.
+	Linux, Windows, and macOS (and other BSD-based systems).
   </h4>
 </div>
 
@@ -51,8 +51,20 @@ may differ based on the running operative system.
 OS | Approach
 --- | ---
 Linux | Establishes a Netlink socket interchange to retrieve network interfaces
-macOS | Uses of `getifaddrs` to retrieve network interfaces
+BSD-based | Uses of `getifaddrs` to retrieve network interfaces
 Windows | Consumes Win32 API's to retrieve the network adapters table
+
+## Operating System Support
+
+Current supported platforms include:
+  - Linux (requires at least [v0.1.0](https://github.com/EstebanBorai/local-ip-address/releases/tag/v0.1.0));
+  - macOS (requires at least [v0.1.0](https://github.com/EstebanBorai/local-ip-address/releases/tag/v0.1.0));
+  - Windows (requires at least [v0.3.0](https://github.com/EstebanBorai/local-ip-address/releases/tag/v0.3.0));
+  - Other BSD-based (requires at least [v0.5.0](https://github.com/EstebanBorai/local-ip-address/releases/tag/v0.5.0)); including:
+    - FreeBSD
+    - OpenBSD
+    - NetBSD
+    - DragonFly
 
 ## Release
 
