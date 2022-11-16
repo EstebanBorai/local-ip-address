@@ -66,6 +66,8 @@ Current supported platforms include:
     - NetBSD
     - DragonFly
 
+Please note that we only test the BSD implementation of this on macOS and FreeBSD, under the assumption that other BSD-based systems will behave similarly.  If you have any complications using this library on the other BSD-based, please create an [issue](https://github.com/EstebanBorai/local-ip-address/issues).
+
 ## Release
 
 In order to create a release you must push a Git tag as follows
