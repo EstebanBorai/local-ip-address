@@ -1,4 +1,3 @@
-use std::alloc::{alloc, dealloc, Layout};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use neli::attr::Attribute;
 use neli::consts::nl::{NlmF, NlmFFlags};
@@ -8,7 +7,7 @@ use neli::nl::{NlPayload, Nlmsghdr};
 use neli::rtnl::Ifaddrmsg;
 use neli::socket::NlSocketHandle;
 use neli::types::RtBuffer;
-use libc::{getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, strlen, AF_INET, AF_INET6};
+use libc::{freeifaddrs, getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, strlen, AF_INET, AF_INET6};
 
 use crate::Error;
 
@@ -97,8 +96,33 @@ pub fn local_ip() -> Result<IpAddr, Error> {
     Err(Error::LocalIpAddressNotFound)
 }
 
-/// `ifaddrs` struct raw pointer alias
-type IfAddrsPtr = *mut *mut ifaddrs;
+struct IfAddrList {
+    ptr: *mut ifaddrs,
+}
+
+impl IfAddrList {
+    fn new() -> Result<IfAddrList, Error> {
+        unsafe {
+            let mut ptr: *mut ifaddrs = std::ptr::null_mut();
+            let res = getifaddrs(&mut ptr);
+            if res != 0 || ptr.is_null() {
+                return Err(Error::StrategyError(format!(
+                    "getifaddrs(3) failed: {}",
+                    std::io::Error::last_os_error()
+                )));
+            }
+            Ok(IfAddrList { ptr })
+        }
+    }
+}
+
+impl Drop for IfAddrList {
+    fn drop(&mut self) {
+        unsafe {
+            freeifaddrs(self.ptr);
+        }
+    }
+}
 
 /// Perform a search over the system's network interfaces using `getifaddrs`,
 /// retrieved network interfaces belonging to both socket address families
@@ -121,21 +145,10 @@ type IfAddrsPtr = *mut *mut ifaddrs;
 /// ```
 pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
     unsafe {
-        let layout = Layout::new::<IfAddrsPtr>();
-        let ptr = alloc(layout);
-        let myaddr = ptr as IfAddrsPtr;
-        let getifaddrs_result = getifaddrs(myaddr);
-
-        if getifaddrs_result != 0 {
-            // an error ocurred on getifaddrs
-            return Err(Error::StrategyError(format!(
-                "GetIfAddrs returned error: {}",
-                getifaddrs_result
-            )));
-        }
+        let ptr_ifaddrs = IfAddrList::new()?;
 
         let mut interfaces: Vec<(String, IpAddr)> = Vec::new();
-        let ifa = myaddr;
+        let mut ifa = ptr_ifaddrs.ptr as *const ifaddrs;
 
         // An instance of `ifaddrs` is build on top of a linked list where
         // `ifaddrs.ifa_next` represent the next node in the list.
@@ -143,13 +156,13 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
         // To find the relevant interface address walk over the nodes of the
         // linked list looking for interface address which belong to the socket
         // address families AF_INET (IPv4) and AF_INET6 (IPv6)
-        while !(**ifa).ifa_next.is_null() {
-            let ifa_addr = (**ifa).ifa_addr;
+        while !(*ifa).ifa_next.is_null() {
+            let ifa_addr = (*ifa).ifa_addr;
 
             // If a tun device is present, no link address is assigned to it and `ifa_addr` is null.
             // See https://github.com/EstebanBorai/local-ip-address/issues/24
             if ifa_addr.is_null() {
-                *ifa = (**ifa).ifa_next;
+                ifa = (*ifa).ifa_next;
                 continue;
             }
 
@@ -174,7 +187,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
 
                     interfaces.push((name, IpAddr::V4(ip_addr)));
 
-                    *ifa = (**ifa).ifa_next;
+                    ifa = (*ifa).ifa_next;
                     continue;
                 }
                 // AF_INET6 IPv6 protocol implementation
@@ -187,24 +200,23 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
 
                     interfaces.push((name, IpAddr::V6(ip_addr)));
 
-                    *ifa = (**ifa).ifa_next;
+                    ifa = (*ifa).ifa_next;
                     continue;
                 }
                 _ => {
-                    *ifa = (**ifa).ifa_next;
+                    ifa = (*ifa).ifa_next;
                     continue;
                 }
             }
         }
 
-        dealloc(ptr, layout);
         Ok(interfaces)
     }
 }
 
 /// Retrieves the name of a interface address
-fn get_ifa_name(ifa: *mut *mut ifaddrs) -> Result<String, Error> {
-    let str = unsafe { (*(*ifa)).ifa_name as *const libc::c_char };
+fn get_ifa_name(ifa: *const ifaddrs) -> Result<String, Error> {
+    let str = unsafe { (*ifa).ifa_name as *const libc::c_char };
     let len = unsafe { strlen(str) };
     let slice = unsafe { std::slice::from_raw_parts(str as *const u8, len) };
 
