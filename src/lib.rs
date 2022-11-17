@@ -2,7 +2,7 @@
 # Local IP Address
 
 Retrieve system's local IP address and Network Interfaces/Adapters on
-Linux, macOS and Windows.
+Linux, Windows, and macOS (and other BSD-based systems).
 
 ## Usage
 
@@ -35,9 +35,15 @@ may differ based on the running operative system.
 OS | Approach
 --- | ---
 Linux | Establishes a Netlink socket interchange to retrieve network interfaces
-macOS | Uses of `getifaddrs` to retrieve network interfaces
+BSD-based | Uses of `getifaddrs` to retrieve network interfaces
 Windows | Consumes Win32 API's to retrieve the network adapters table
 
+Supported BSD-based systems include:
+  - macOS
+  - FreeBSD
+  - OpenBSD
+  - NetBSD
+  - DragonFly
 */
 use std::net::IpAddr;
 
@@ -50,10 +56,22 @@ pub mod linux;
 #[cfg(target_os = "linux")]
 pub use crate::linux::*;
 
-#[cfg(any(target_os = "macos", target_os = "openbsd"))]
-pub mod macos;
-#[cfg(any(target_os = "macos", target_os = "openbsd"))]
-pub use crate::macos::*;
+#[cfg(any(
+    target_os = "macos",
+    target_os = "freebsd",
+    target_os = "openbsd",
+    target_os = "netbsd",
+    target_os = "dragonfly"
+))]
+pub mod bsd;
+#[cfg(any(
+    target_os = "macos",
+    target_os = "freebsd",
+    target_os = "openbsd",
+    target_os = "netbsd",
+    target_os = "dragonfly"
+))]
+pub use crate::bsd::*;
 
 #[cfg(target_family = "windows")]
 pub mod windows;
@@ -68,7 +86,7 @@ pub use crate::windows::*;
 /// For linux based systems the Netlink socket communication is used to
 /// retrieve the local network interface.
 ///
-/// For macOS systems the `getifaddrs` approach is taken using `libc`
+/// For BSD-based systems the `getifaddrs` approach is taken using `libc`
 ///
 /// For Windows systems Win32's IP Helper is used to gather the Local IP
 /// address
@@ -78,11 +96,17 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         crate::linux::local_ip()
     }
 
-    #[cfg(any(target_os = "macos", target_os = "openbsd"))]
+    #[cfg(any(
+        target_os = "macos",
+        target_os = "freebsd",
+        target_os = "openbsd",
+        target_os = "netbsd",
+        target_os = "dragonfly"
+    ))]
     {
         use std::env;
 
-        let ifas = crate::macos::list_afinet_netifas()?;
+        let ifas = crate::bsd::list_afinet_netifas()?;
 
         if let Some((_, ipaddr)) = find_ifa(ifas, "en0") {
             return Ok(ipaddr);
