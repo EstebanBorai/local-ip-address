@@ -11,9 +11,13 @@ Get the local IP address of your system by executing the `local_ip` function:
 ```rust
 use local_ip_address::local_ip;
 
-let my_local_ip = local_ip().unwrap();
+let my_local_ip = local_ip();
 
-println!("This is my local IP address: {:?}", my_local_ip);
+if let Ok(my_local_ip) = my_local_ip {
+    println!("This is my local IP address: {:?}", my_local_ip);
+} else {
+    println!("Error getting local IP: {:?}", my_local_ip);
+}
 ```
 
 Retrieve all the available network interfaces from both, the `AF_INET` and
@@ -22,10 +26,14 @@ the `AF_INET6` family by executing the `list_afinet_netifas` function:
 ```rust
 use local_ip_address::list_afinet_netifas;
 
-let network_interfaces = list_afinet_netifas().unwrap();
+let network_interfaces = list_afinet_netifas();
 
-for (name, ip) in network_interfaces.iter() {
-    println!("{}:\t{:?}", name, ip);
+if let Ok(network_interfaces) = network_interfaces {
+    for (name, ip) in network_interfaces.iter() {
+        println!("{}:\t{:?}", name, ip);
+    }
+} else {
+    println!("Error getting network interfaces: {:?}", network_interfaces);
 }
 ```
 
@@ -45,6 +53,15 @@ Supported BSD-based systems include:
   - NetBSD
   - DragonFly
 */
+#[cfg(any(
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "freebsd",
+    target_os = "openbsd",
+    target_os = "netbsd",
+    target_os = "dragonfly",
+))]
+use std::env;
 use std::net::IpAddr;
 
 mod error;
@@ -61,7 +78,7 @@ pub use crate::linux::*;
     target_os = "freebsd",
     target_os = "openbsd",
     target_os = "netbsd",
-    target_os = "dragonfly"
+    target_os = "dragonfly",
 ))]
 pub mod bsd;
 #[cfg(any(
@@ -69,7 +86,7 @@ pub mod bsd;
     target_os = "freebsd",
     target_os = "openbsd",
     target_os = "netbsd",
-    target_os = "dragonfly"
+    target_os = "dragonfly",
 ))]
 pub use crate::bsd::*;
 
@@ -101,11 +118,9 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         target_os = "freebsd",
         target_os = "openbsd",
         target_os = "netbsd",
-        target_os = "dragonfly"
+        target_os = "dragonfly",
     ))]
     {
-        use std::env;
-
         let ifas = crate::bsd::list_afinet_netifas()?;
 
         if let Some((_, ipaddr)) = find_ifa(ifas, "en0") {
@@ -117,8 +132,6 @@ pub fn local_ip() -> Result<IpAddr, Error> {
 
     #[cfg(target_os = "windows")]
     {
-        use std::env;
-
         use windows_sys::Win32::Networking::WinSock::AF_INET;
 
         let ip_addresses = crate::windows::list_local_ip_addresses(AF_INET)?;
@@ -127,6 +140,20 @@ pub fn local_ip() -> Result<IpAddr, Error> {
             .into_iter()
             .find(|ip_address| matches!(ip_address, IpAddr::V4(_)))
             .ok_or_else(|| Error::PlatformNotSupported(env::consts::OS.to_string()))
+    }
+
+    // A catch-all case to error if not implemented for OS
+    #[cfg(not(any(
+        target_os = "linux",
+        target_os = "windows",
+        target_os = "macos",
+        target_os = "freebsd",
+        target_os = "openbsd",
+        target_os = "netbsd",
+        target_os = "dragonfly",
+    )))]
+    {
+        Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
     }
 }
 
@@ -137,6 +164,20 @@ pub fn find_ifa(ifas: Vec<(String, IpAddr)>, ifa_name: &str) -> Option<(String, 
         .find(|(name, ipaddr)| name == ifa_name && matches!(ipaddr, IpAddr::V4(_)))
 }
 
+// A catch-all function to error if not implemented for OS
+#[cfg(not(any(
+    target_os = "linux",
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "freebsd",
+    target_os = "openbsd",
+    target_os = "netbsd",
+    target_os = "dragonfly",
+)))]
+pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
+    Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
+}
+
 mod tests {
     #[allow(unused_imports)]
     use super::*;
@@ -144,27 +185,27 @@ mod tests {
     #[test]
     #[cfg(target_os = "linux")]
     fn find_local_ip() {
-        let my_local_ip = local_ip().unwrap();
+        let my_local_ip = local_ip();
 
-        assert!(matches!(my_local_ip, IpAddr::V4(_)));
+        assert!(matches!(my_local_ip, Ok(IpAddr::V4(_))));
         println!("Linux 'local_ip': {:?}", my_local_ip);
     }
 
     #[test]
     #[cfg(target_os = "macos")]
     fn find_local_ip() {
-        let my_local_ip = local_ip().unwrap();
+        let my_local_ip = local_ip();
 
-        assert!(matches!(my_local_ip, IpAddr::V4(_)));
+        assert!(matches!(my_local_ip, Ok(IpAddr::V4(_))));
         println!("macOS 'local_ip': {:?}", my_local_ip);
     }
 
     #[test]
     #[cfg(target_os = "windows")]
     fn find_local_ip() {
-        let my_local_ip = local_ip().unwrap();
+        let my_local_ip = local_ip();
 
-        assert!(matches!(my_local_ip, IpAddr::V4(_)));
+        assert!(matches!(my_local_ip, Ok(IpAddr::V4(_))));
         println!("Windows 'local_ip': {:?}", my_local_ip);
     }
 
@@ -174,7 +215,7 @@ mod tests {
         let network_interfaces = list_afinet_netifas();
 
         assert!(network_interfaces.is_ok());
-        assert!(network_interfaces.unwrap().len() >= 1);
+        assert!(!network_interfaces.unwrap().is_empty());
     }
 
     #[test]
@@ -183,7 +224,7 @@ mod tests {
         let network_interfaces = list_afinet_netifas();
 
         assert!(network_interfaces.is_ok());
-        assert!(network_interfaces.unwrap().len() >= 1);
+        assert!(!network_interfaces.unwrap().is_empty());
     }
 
     #[test]
@@ -192,6 +233,6 @@ mod tests {
         let network_interfaces = list_afinet_netifas();
 
         assert!(network_interfaces.is_ok());
-        assert!(network_interfaces.unwrap().len() >= 1);
+        assert!(!network_interfaces.unwrap().is_empty());
     }
 }
