@@ -132,6 +132,8 @@ pub fn local_ip() -> Result<IpAddr, Error> {
 
     #[cfg(target_os = "windows")]
     {
+        use windows_sys::Win32::Networking::WinSock::AF_INET;
+
         let ip_addresses = crate::windows::list_local_ip_addresses(AF_INET)?;
 
         ip_addresses
