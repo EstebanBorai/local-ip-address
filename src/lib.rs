@@ -53,7 +53,14 @@ Supported BSD-based systems include:
   - NetBSD
   - DragonFly
 */
-#[cfg(not(target_os = "linux"))]
+#[cfg(any(
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "freebsd",
+    target_os = "openbsd",
+    target_os = "netbsd",
+    target_os = "dragonfly",
+))]
 use std::env;
 use std::net::IpAddr;
 
