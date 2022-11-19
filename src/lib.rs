@@ -192,12 +192,18 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_os = "macos")]
+    #[cfg(any(
+        target_os = "macos",
+        target_os = "freebsd",
+        target_os = "openbsd",
+        target_os = "netbsd",
+        target_os = "dragonfly",
+    ))]
     fn find_local_ip() {
         let my_local_ip = local_ip();
 
         assert!(matches!(my_local_ip, Ok(IpAddr::V4(_))));
-        println!("macOS 'local_ip': {:?}", my_local_ip);
+        println!("BSD 'local_ip': {:?}", my_local_ip);
     }
 
     #[test]
@@ -219,7 +225,13 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_os = "macos")]
+    #[cfg(any(
+        target_os = "macos",
+        target_os = "freebsd",
+        target_os = "openbsd",
+        target_os = "netbsd",
+        target_os = "dragonfly",
+    ))]
     fn find_network_interfaces() {
         let network_interfaces = list_afinet_netifas();
 

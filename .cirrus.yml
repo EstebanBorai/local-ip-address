@@ -1,0 +1,75 @@
+# Cirrus workflow for testing on (Free)BSD.
+#
+# References:
+#   - https://cirrus-ci.org/guide/writing-tasks/
+#   - https://github.com/tokio-rs/tokio/blob/master/.cirrus.yml
+#   - https://github.com/nix-rust/nix/blob/master/.cirrus.yml
+#   - https://github.com/jakewilliami/HiddenFiles.jl/blob/master/.cirrus.yml
+#
+# TODO:
+#   - Research best way to have different tests (one task with matrix or multiple tasks)
+#   - Implement tests for other BSD OS's (will need to handle setup differently for Tier 3 support OS's)
+
+# Set up environment variables
+env:
+  BUILD: build
+  RUSTFLAGS: -D warnings
+  RUSTDOCFLAGS: -D warnings
+  TESTFLAGS: -- --nocapture
+  TOOL: cargo
+  TOOLCHAIN: 1
+  ZFLAGS:
+
+# Define set up procedure by downloading Rustup (to consume later)
+setup_common: &SETUP
+  setup_script:  # install_script
+    - pkg install -y bash curl
+    - curl https://sh.rustup.rs -sSf --output rustup.sh
+    - sh rustup.sh -y --profile minimal --default-toolchain $RUST_STABLE
+
+# Cache the Cargo directory between runs
+cargo_cache:
+  folder: $CARGO_HOME/registry
+  fingerprint_script: cat Cargo.lock || echo ""
+
+task:
+  # Specify container (FreeBSD): https://cirrus-ci.org/guide/writing-tasks/#execution-environment
+  freebsd_instance:
+    image: freebsd-12-3-release-amd64  # freebsd-13-1-release-amd64
+
+  # Set up Rust environment using Rustup
+  <<: *SETUP
+
+  matrix:
+    - name: "Runs \"cargo test\" on FreeBSD 12"
+      test_script:
+        - . $HOME/.cargo/env || true
+        - $TOOL -Vv
+        - rustc -Vv
+        - $TOOL test -- --nocapture $RUSTFLAGS  # --all --all-features
+        - $TOOL doc $ZFLAGS --no-deps --target $TARGET $RUSTDOCFLAGS
+      before_cache_script: rm -rf $CARGO_HOME/registry/index
+    - name: "Builds on FreeBSD 12"
+      test_script:
+        - . $HOME/.cargo/env || true
+        - $TOOL -Vv
+        - rustc -Vv
+        - $TOOL $BUILD $ZFLAGS --target $TARGET --all-targets
+    - name: "Runs \"cargo clippy\" on FreeBSD 12"
+      test_script:
+        - . $HOME/.cargo/env || true
+        - $TOOL -Vv
+        - rustc -Vv
+        - $TOOL clippy $ZFLAGS --target $TARGET --all-targets -- $RUSTFLAGS
+    - name: "Runs \"cargo fmt\" on FreeBSD 12"
+      test_script:
+        - . $HOME/.cargo/env || true
+        - $TOOL -Vv
+        - rustc -Vv
+        - $TOOL fmt
+    - name: "Runs \"cargo publish --dry-run\" on FreeBSD 12"
+      test_script:
+        - . $HOME/.cargo/env || true
+        - $TOOL -Vv
+        - rustc -Vv
+        - $TOOL publish --dry-run
