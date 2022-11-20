@@ -16,8 +16,10 @@ env:
   RUSTFLAGS: -D warnings
   RUSTDOCFLAGS: -D warnings
   TESTFLAGS: -- --nocapture
-  TOOL: cargo
-  TOOLCHAIN: 1
+  TOOL: carg
+  # The minimum supported Rust version (MSRV)
+  # https://github.com/foresterre/cargo-msrv
+  TOOLCHAIN: 1.56.1
   ZFLAGS:
 
 # Define set up procedure by downloading Rustup (to consume later)
