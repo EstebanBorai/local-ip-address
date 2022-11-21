@@ -16,7 +16,7 @@ env:
   RUSTFLAGS: -D warnings
   RUSTDOCFLAGS: -D warnings
   TESTFLAGS: -- --nocapture
-  TOOL: carg
+  TOOL: cargo
   # The minimum supported Rust version (MSRV)
   # https://github.com/foresterre/cargo-msrv
   TOOLCHAIN: 1.56.1
