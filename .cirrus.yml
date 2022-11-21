@@ -12,25 +12,19 @@
 
 # Set up environment variables
 env:
-  BUILD: build
-  RUSTFLAGS: -D warnings
-  RUSTDOCFLAGS: -D warnings
-  TESTFLAGS: -- --nocapture
-  TOOL: cargo
   # The minimum supported Rust version (MSRV)
   # https://github.com/foresterre/cargo-msrv
   TOOLCHAIN: 1.56.1
-  ZFLAGS:
 
 # Define set up procedure by downloading Rustup (to consume later)
 setup_common: &SETUP
-  setup_script:  # install_script
+  setup_script:
     - kldload mqueuefs
     - fetch https://sh.rustup.rs -o rustup.sh
     - sh rustup.sh -y --profile=minimal --default-toolchain $TOOLCHAIN
-    - . $HOME/.cargo/env || true
     - rustup component add --toolchain $TOOLCHAIN clippy
-    - $TOOL -Vv
+    - . $HOME/.cargo/env || true
+    - cargo -Vv
     - rustc -Vv
 
 # Cache the Cargo directory between runs
@@ -47,20 +41,27 @@ task:
   <<: *SETUP
 
   matrix:
+    # Run Unit Tests
     - name: "Runs \"cargo test\" on FreeBSD 13"
       test_script:
-        - $TOOL test -- --nocapture $RUSTFLAGS  # --all --all-features
-        - $TOOL doc $ZFLAGS --no-deps --target $TARGET $RUSTDOCFLAGS
+        - cargo test --all --all-features -- --nocapture -D warnings
+        - cargo doc --no-deps --target $TARGET
       before_cache_script: rm -rf $CARGO_HOME/registry/index
+
+    # Test Cargo Build
     - name: "Builds on FreeBSD 13"
-      test_script:
-        - $TOOL $BUILD $ZFLAGS --target $TARGET --all-targets
+      test_script: cargo build +$TOOLCHAIN --release --target $TARGET --all-targets
+
+    # Test Cargo Clippy
     - name: "Runs \"cargo clippy\" on FreeBSD 13"
-      test_script:
-        - $TOOL clippy $ZFLAGS --target $TARGET --all-targets -- $RUSTFLAGS
+      install_script: rustup component add --toolchain $TOOLCHAIN clippy
+      test_script: cargo clippy --target $TARGET --all-targets -- -D warnings
+
+    # Test Cargo Fmt
     - name: "Runs \"cargo fmt\" on FreeBSD 13"
-      test_script:
-        - $TOOL fmt
+      install_script: rustup +$TOOLCHAIN component add rustfmt
+      test_script: cargo fmt --all -- --check
+
+    # Test Cargo Publish
     - name: "Runs \"cargo publish --dry-run\" on FreeBSD 13"
-      test_script:
-        - $TOOL publish --dry-run
+      test_script: cargo publish --dry-run
