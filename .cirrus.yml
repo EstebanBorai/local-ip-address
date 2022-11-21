@@ -22,7 +22,6 @@ setup_common: &SETUP
     - kldload mqueuefs
     - fetch https://sh.rustup.rs -o rustup.sh
     - sh rustup.sh -y --profile=minimal --default-toolchain $TOOLCHAIN
-    - rustup component add --toolchain $TOOLCHAIN clippy
     - . $HOME/.cargo/env || true
     - cargo -Vv
     - rustc -Vv
