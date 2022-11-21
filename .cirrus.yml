@@ -43,6 +43,17 @@ cargo_cache:
   folder: $CARGO_HOME/registry
   fingerprint_script: cat Cargo.lock || echo ""
 
+# Test Cargo Build
+task:
+  name: "Builds on FreeBSD 13"
+  <<: *SETUP
+  env:
+    RUSTFLAGS: "-D warnings"
+  test_script:
+    - . $HOME/.cargo/env || true
+    - cargo +$TOOLCHAIN build --release --all-targets
+  before_cache_script: rm -rf $CARGO_HOME/registry/index
+
 # Run Unit Tests
 task:
   name: "Runs \"cargo test\" on FreeBSD 13"
@@ -53,18 +64,7 @@ task:
   test_script:
     - . $HOME/.cargo/env || true
     - cargo +$TOOLCHAIN test --all --all-features -- --nocapture
-    - cargo +$TOOLCHAIN doc --no-deps --target $TARGET
-  before_cache_script: rm -rf $CARGO_HOME/registry/index
-
-# Test Cargo Build
-task:
-  name: "Builds on FreeBSD 13"
-  <<: *SETUP
-  env:
-    RUSTFLAGS: "-D warnings"
-  test_script:
-    - . $HOME/.cargo/env || true
-    - cargo +$TOOLCHAIN build --release --target $TARGET --all-targets
+    - cargo +$TOOLCHAIN doc --no-deps
   before_cache_script: rm -rf $CARGO_HOME/registry/index
 
 # Test Cargo Clippy
@@ -76,7 +76,7 @@ task:
     - rustup component add --toolchain $TOOLCHAIN clippy
   test_script:
     - . $HOME/.cargo/env || true
-    - cargo +$TOOLCHAIN clippy --target $TARGET --all-targets
+    - cargo +$TOOLCHAIN clippy --all-targets
   before_cache_script: rm -rf $CARGO_HOME/registry/index
 
 # Test Cargo Fmt
