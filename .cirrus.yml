@@ -1,3 +1,4 @@
+############################################################################
 # Cirrus workflow for testing on (Free)BSD.
 #
 # References:
@@ -7,8 +8,17 @@
 #   - https://github.com/jakewilliami/HiddenFiles.jl/blob/master/.cirrus.yml
 #
 # TODO:
-#   - Research best way to have different tests (one task with matrix or multiple tasks)
-#   - Implement tests for other BSD OS's (will need to handle setup differently for Tier 3 support OS's)
+#   - Implement tests for other BSD OS's (will need to handle setup
+#       differently for Tier 3 support OS's)
+############################################################################
+
+# Specify container (FreeBSD)
+#
+# References:
+#   - https://cirrus-ci.org/guide/writing-tasks/#execution-environment
+#   - https://cirrus-ci.org/guide/FreeBSD/
+freebsd_instance:
+  image: freebsd-13-1-release-amd64  # freebsd-12-3-release-amd64
 
 # Set up environment variables
 env:
@@ -32,41 +42,41 @@ cargo_cache:
   folder: $CARGO_HOME/registry
   fingerprint_script: cat Cargo.lock || echo ""
 
+# Run Unit Tests
 task:
-  # Specify container (FreeBSD): https://cirrus-ci.org/guide/writing-tasks/#execution-environment
-  freebsd_instance:
-    image: freebsd-13-1-release-amd64  # freebsd-12-3-release-amd64
-
-  # Set up Rust environment using Rustup
+  name: "Runs \"cargo test\" on FreeBSD 13"
   <<: *SETUP
+  test_script:
+    - cargo test --all --all-features -- --nocapture -D warnings
+    - cargo doc --no-deps --target $TARGET
+  before_cache_script: rm -rf $CARGO_HOME/registry/index
 
-  matrix:
-    # Run Unit Tests
-    - name: "Runs \"cargo test\" on FreeBSD 13"
-      setup_script: . $HOME/.cargo/env || true
-      test_script:
-        - cargo test --all --all-features -- --nocapture -D warnings
-        - cargo doc --no-deps --target $TARGET
-      before_cache_script: rm -rf $CARGO_HOME/registry/index
+# Test Cargo Build
+task:
+  name: "Builds on FreeBSD 13"
+  <<: *SETUP
+  test_script: cargo build +$TOOLCHAIN --release --target $TARGET --all-targets
+  before_cache_script: rm -rf $CARGO_HOME/registry/index
 
-    # Test Cargo Build
-    - name: "Builds on FreeBSD 13"
-      setup_script: . $HOME/.cargo/env || true
-      test_script: cargo build +$TOOLCHAIN --release --target $TARGET --all-targets
+# Test Cargo Clippy
+task:
+  name: "Runs \"cargo clippy\" on FreeBSD 13"
+  <<: *SETUP
+  install_script: rustup component add --toolchain $TOOLCHAIN clippy
+  test_script: cargo clippy --target $TARGET --all-targets -- -D warnings
+  before_cache_script: rm -rf $CARGO_HOME/registry/index
 
-    # Test Cargo Clippy
-    - name: "Runs \"cargo clippy\" on FreeBSD 13"
-      setup_script: . $HOME/.cargo/env || true
-      install_script: rustup component add --toolchain $TOOLCHAIN clippy
-      test_script: cargo clippy --target $TARGET --all-targets -- -D warnings
+# Test Cargo Fmt
+task:
+  name: "Runs \"cargo fmt\" on FreeBSD 13"
+  <<: *SETUP
+  install_script: rustup +$TOOLCHAIN component add rustfmt
+  test_script: cargo fmt --all -- --check
+  before_cache_script: rm -rf $CARGO_HOME/registry/index
 
-    # Test Cargo Fmt
-    - name: "Runs \"cargo fmt\" on FreeBSD 13"
-      setup_script: . $HOME/.cargo/env || true
-      install_script: rustup +$TOOLCHAIN component add rustfmt
-      test_script: cargo fmt --all -- --check
-
-    # Test Cargo Publish
-    - name: "Runs \"cargo publish --dry-run\" on FreeBSD 13"
-      setup_script: . $HOME/.cargo/env || true
-      test_script: cargo publish --dry-run
+# Test Cargo Publish
+task:
+  name: "Runs \"cargo publish --dry-run\" on FreeBSD 13"
+  <<: *SETUP
+  test_script: cargo publish --dry-run
+  before_cache_script: rm -rf $CARGO_HOME/registry/index
