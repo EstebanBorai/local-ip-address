@@ -25,10 +25,11 @@ env:
 # Define set up procedure by downloading Rustup (to consume later)
 setup_common: &SETUP
   setup_script:  # install_script
-    - pkg install -y bash curl
-    - curl https://sh.rustup.rs -sSf --output rustup.sh
-    - sh rustup.sh -y --profile minimal --default-toolchain $RUST_STABLE
+    - kldload mqueuefs
+    - fetch https://sh.rustup.rs -o rustup.sh
+    - sh rustup.sh -y --profile=minimal --default-toolchain $TOOLCHAIN
     - . $HOME/.cargo/env || true
+    - rustup component add --toolchain $TOOLCHAIN clippy
     - $TOOL -Vv
     - rustc -Vv
 
