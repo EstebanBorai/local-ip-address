@@ -23,6 +23,7 @@ setup_common: &SETUP
     - fetch https://sh.rustup.rs -o rustup.sh
     - sh rustup.sh -y --profile=minimal --default-toolchain $TOOLCHAIN
     - . $HOME/.cargo/env || true
+    - rustup --version
     - cargo -Vv
     - rustc -Vv
 
@@ -42,6 +43,7 @@ task:
   matrix:
     # Run Unit Tests
     - name: "Runs \"cargo test\" on FreeBSD 13"
+      setup_script: . $HOME/.cargo/env || true
       test_script:
         - cargo test --all --all-features -- --nocapture -D warnings
         - cargo doc --no-deps --target $TARGET
@@ -49,18 +51,22 @@ task:
 
     # Test Cargo Build
     - name: "Builds on FreeBSD 13"
+      setup_script: . $HOME/.cargo/env || true
       test_script: cargo build +$TOOLCHAIN --release --target $TARGET --all-targets
 
     # Test Cargo Clippy
     - name: "Runs \"cargo clippy\" on FreeBSD 13"
+      setup_script: . $HOME/.cargo/env || true
       install_script: rustup component add --toolchain $TOOLCHAIN clippy
       test_script: cargo clippy --target $TARGET --all-targets -- -D warnings
 
     # Test Cargo Fmt
     - name: "Runs \"cargo fmt\" on FreeBSD 13"
+      setup_script: . $HOME/.cargo/env || true
       install_script: rustup +$TOOLCHAIN component add rustfmt
       test_script: cargo fmt --all -- --check
 
     # Test Cargo Publish
     - name: "Runs \"cargo publish --dry-run\" on FreeBSD 13"
+      setup_script: . $HOME/.cargo/env || true
       test_script: cargo publish --dry-run
