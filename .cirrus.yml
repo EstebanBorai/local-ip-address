@@ -46,9 +46,12 @@ cargo_cache:
 task:
   name: "Runs \"cargo test\" on FreeBSD 13"
   <<: *SETUP
+  env:
+    RUSTFLAGS: "-D warnings"
+    RUSTDOCFLAGS: -D warnings
   test_script:
     - . $HOME/.cargo/env || true
-    - cargo test --all --all-features -- --nocapture -D warnings
+    - cargo test --all --all-features -- --nocapture
     - cargo doc --no-deps --target $TARGET
   before_cache_script: rm -rf $CARGO_HOME/registry/index
 
@@ -56,6 +59,8 @@ task:
 task:
   name: "Builds on FreeBSD 13"
   <<: *SETUP
+  env:
+    RUSTFLAGS: "-D warnings"
   test_script:
     - . $HOME/.cargo/env || true
     - cargo build +$TOOLCHAIN --release --target $TARGET --all-targets
@@ -68,7 +73,7 @@ task:
   install_script: rustup component add --toolchain $TOOLCHAIN clippy
   test_script:
     - . $HOME/.cargo/env || true
-    - cargo clippy --target $TARGET --all-targets -- -D warnings
+    - cargo clippy --target $TARGET --all-targets
   before_cache_script: rm -rf $CARGO_HOME/registry/index
 
 # Test Cargo Fmt
