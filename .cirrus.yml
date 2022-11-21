@@ -70,7 +70,9 @@ task:
 task:
   name: "Runs \"cargo clippy\" on FreeBSD 13"
   <<: *SETUP
-  install_script: rustup component add --toolchain $TOOLCHAIN clippy
+  install_script:
+    - . $HOME/.cargo/env || true
+    - rustup component add --toolchain $TOOLCHAIN clippy
   test_script:
     - . $HOME/.cargo/env || true
     - cargo +$TOOLCHAIN clippy --target $TARGET --all-targets
@@ -80,7 +82,9 @@ task:
 task:
   name: "Runs \"cargo fmt\" on FreeBSD 13"
   <<: *SETUP
-  install_script: rustup +$TOOLCHAIN component add rustfmt
+  install_script:
+    - . $HOME/.cargo/env || true
+    - rustup +$TOOLCHAIN component add rustfmt
   test_script:
     - . $HOME/.cargo/env || true
     - cargo +$TOOLCHAIN fmt --all -- --check
