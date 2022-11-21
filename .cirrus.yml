@@ -47,6 +47,7 @@ task:
   name: "Runs \"cargo test\" on FreeBSD 13"
   <<: *SETUP
   test_script:
+    - . $HOME/.cargo/env || true
     - cargo test --all --all-features -- --nocapture -D warnings
     - cargo doc --no-deps --target $TARGET
   before_cache_script: rm -rf $CARGO_HOME/registry/index
@@ -55,7 +56,9 @@ task:
 task:
   name: "Builds on FreeBSD 13"
   <<: *SETUP
-  test_script: cargo build +$TOOLCHAIN --release --target $TARGET --all-targets
+  test_script:
+    - . $HOME/.cargo/env || true
+    - cargo build +$TOOLCHAIN --release --target $TARGET --all-targets
   before_cache_script: rm -rf $CARGO_HOME/registry/index
 
 # Test Cargo Clippy
@@ -63,7 +66,9 @@ task:
   name: "Runs \"cargo clippy\" on FreeBSD 13"
   <<: *SETUP
   install_script: rustup component add --toolchain $TOOLCHAIN clippy
-  test_script: cargo clippy --target $TARGET --all-targets -- -D warnings
+  test_script:
+    - . $HOME/.cargo/env || true
+    - cargo clippy --target $TARGET --all-targets -- -D warnings
   before_cache_script: rm -rf $CARGO_HOME/registry/index
 
 # Test Cargo Fmt
@@ -71,12 +76,16 @@ task:
   name: "Runs \"cargo fmt\" on FreeBSD 13"
   <<: *SETUP
   install_script: rustup +$TOOLCHAIN component add rustfmt
-  test_script: cargo fmt --all -- --check
+  test_script:
+    - . $HOME/.cargo/env || true
+    - cargo fmt --all -- --check
   before_cache_script: rm -rf $CARGO_HOME/registry/index
 
 # Test Cargo Publish
 task:
   name: "Runs \"cargo publish --dry-run\" on FreeBSD 13"
   <<: *SETUP
-  test_script: cargo publish --dry-run
+  test_script:
+    - . $HOME/.cargo/env || true
+    - cargo publish --dry-run
   before_cache_script: rm -rf $CARGO_HOME/registry/index
