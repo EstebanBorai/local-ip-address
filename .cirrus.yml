@@ -28,6 +28,9 @@ setup_common: &SETUP
     - pkg install -y bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --profile minimal --default-toolchain $RUST_STABLE
+    - . $HOME/.cargo/env || true
+    - $TOOL -Vv
+    - rustc -Vv
 
 # Cache the Cargo directory between runs
 cargo_cache:
@@ -45,33 +48,18 @@ task:
   matrix:
     - name: "Runs \"cargo test\" on FreeBSD 12"
       test_script:
-        - . $HOME/.cargo/env || true
-        - $TOOL -Vv
-        - rustc -Vv
         - $TOOL test -- --nocapture $RUSTFLAGS  # --all --all-features
         - $TOOL doc $ZFLAGS --no-deps --target $TARGET $RUSTDOCFLAGS
       before_cache_script: rm -rf $CARGO_HOME/registry/index
     - name: "Builds on FreeBSD 12"
       test_script:
-        - . $HOME/.cargo/env || true
-        - $TOOL -Vv
-        - rustc -Vv
         - $TOOL $BUILD $ZFLAGS --target $TARGET --all-targets
     - name: "Runs \"cargo clippy\" on FreeBSD 12"
       test_script:
-        - . $HOME/.cargo/env || true
-        - $TOOL -Vv
-        - rustc -Vv
         - $TOOL clippy $ZFLAGS --target $TARGET --all-targets -- $RUSTFLAGS
     - name: "Runs \"cargo fmt\" on FreeBSD 12"
       test_script:
-        - . $HOME/.cargo/env || true
-        - $TOOL -Vv
-        - rustc -Vv
         - $TOOL fmt
     - name: "Runs \"cargo publish --dry-run\" on FreeBSD 12"
       test_script:
-        - . $HOME/.cargo/env || true
-        - $TOOL -Vv
-        - rustc -Vv
         - $TOOL publish --dry-run
