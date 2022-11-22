@@ -123,7 +123,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
     {
         let ifas = crate::bsd::list_afinet_netifas()?;
 
-        if let Some((_, ipaddr)) = find_ifa(ifas, "en0") {
+        if let Some((_, ipaddr)) = find_ifa(ifas, vec!["en0", "epair0b"]) {
             return Ok(ipaddr);
         }
 
@@ -157,11 +157,12 @@ pub fn local_ip() -> Result<IpAddr, Error> {
     }
 }
 
-/// Finds the network interface with the provided name in the vector of network
+/// Finds the network interface with any of the provided names in the vector of network
 /// interfaces provided
-pub fn find_ifa(ifas: Vec<(String, IpAddr)>, ifa_name: &str) -> Option<(String, IpAddr)> {
-    ifas.into_iter()
-        .find(|(name, ipaddr)| name == ifa_name && matches!(ipaddr, IpAddr::V4(_)))
+pub fn find_ifa(ifas: Vec<(String, IpAddr)>, ifa_names: Vec<&str>) -> Option<(String, IpAddr)> {
+    ifas.into_iter().find(|(name, ipaddr)| {
+        ifa_names.contains(&name.as_str()) && matches!(ipaddr, IpAddr::V4(_))
+    })
 }
 
 // A catch-all function to error if not implemented for OS
