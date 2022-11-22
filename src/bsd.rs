@@ -27,6 +27,25 @@ type IfAddrsPtr = *mut *mut ifaddrs;
 /// }
 /// ```
 pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
+    match list_afinet_netifas_info() {
+        Ok(interfaces) => {
+            Ok(interfaces.iter().map(|i| {
+                (i.iname.clone(), i.addr)
+            }).collect())
+        },
+        Err(e) => Err(e),
+    }
+}
+
+pub struct AfInetInfo {
+    pub addr: IpAddr,
+    pub iname: String,
+    pub is_loopback: bool,
+}
+
+// Internal methos to list AF_INET info in a struct.  This metho is used by
+// list_afiinet_netifas and local_ip,
+pub fn list_afinet_netifas_info() -> Result<Vec<AfInetInfo>, Error> {
     unsafe {
         let layout = Layout::new::<IfAddrsPtr>();
         let ptr = alloc(layout);
@@ -41,7 +60,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
             )));
         }
 
-        let mut interfaces: Vec<(String, IpAddr)> = Vec::new();
+        let mut interfaces: Vec<AfInetInfo> = Vec::new();
         let ifa = myaddr;
 
         // An instance of `ifaddrs` is build on top of a linked list where
@@ -56,25 +75,25 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
             match (*ifa_addr).sa_family as i32 {
                 // AF_INET IPv4 protocol implementation
                 AF_INET => {
-                    if !is_loopback_addr(ifa) {
-                        let interface_address = ifa_addr;
-                        let socket_addr_v4: *mut sockaddr_in = interface_address as *mut sockaddr_in;
-                        let in_addr = (*socket_addr_v4).sin_addr;
-                        let mut ip_addr = Ipv4Addr::from(in_addr.s_addr);
+                    let interface_address = ifa_addr;
+                    let socket_addr_v4: *mut sockaddr_in = interface_address as *mut sockaddr_in;
+                    let in_addr = (*socket_addr_v4).sin_addr;
+                    let mut ip_addr = Ipv4Addr::from(in_addr.s_addr);
 
-                        if cfg!(target_endian = "little") {
-                            // due to a difference on how bytes are arranged on a
-                            // single word of memory by the CPU, swap bytes based
-                            // on CPU endianess to avoid having twisted IP addresses
-                            //
-                            // refer: https://github.com/rust-lang/rust/issues/48819
-                            ip_addr = Ipv4Addr::from(in_addr.s_addr.swap_bytes());
-                        }
-
-                        let name = get_ifa_name(ifa)?;
-
-                        interfaces.push((name, IpAddr::V4(ip_addr)));
+                    if cfg!(target_endian = "little") {
+                        // due to a difference on how bytes are arranged on a
+                        // single word of memory by the CPU, swap bytes based
+                        // on CPU endianess to avoid having twisted IP addresses
+                        //
+                        // refer: https://github.com/rust-lang/rust/issues/48819
+                        ip_addr = Ipv4Addr::from(in_addr.s_addr.swap_bytes());
                     }
+
+                    interfaces.push(AfInetInfo {
+                        addr: IpAddr::V4(ip_addr),
+                        iname: get_ifa_name(ifa)?,
+                        is_loopback: is_loopback_addr(ifa),
+                    });
                 }
                 // AF_INET6 IPv6 protocol implementation
                 AF_INET6 => {
@@ -82,9 +101,12 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
                     let socket_addr_v6: *mut sockaddr_in6 = interface_address as *mut sockaddr_in6;
                     let in6_addr = (*socket_addr_v6).sin6_addr;
                     let ip_addr = Ipv6Addr::from(in6_addr.s6_addr);
-                    let name = get_ifa_name(ifa)?;
 
-                    interfaces.push((name, IpAddr::V6(ip_addr)));
+                    interfaces.push(AfInetInfo {
+                        addr: IpAddr::V6(ip_addr),
+                        iname: get_ifa_name(ifa)?,
+                        is_loopback: is_loopback_addr(ifa),
+                    });
                 }
                 _ => {}
             }

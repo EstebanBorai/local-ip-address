@@ -121,11 +121,17 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         target_os = "dragonfly",
     ))]
     {
-        let ifas = crate::bsd::list_afinet_netifas()?;
+        let ifas = crate::bsd::list_afinet_netifas_info()?;
 
         ifas
             .into_iter()
-            .map(|(_iname, ip_addr)| ip_addr)
+            .filter_map(|interface| {
+                if interface.is_loopback {
+                    Some(interface.addr)
+                } else {
+                    None
+                }
+            })
             .find(|ip_addr| matches!(ip_addr, IpAddr::V4(_)))
             .ok_or_else(|| Error::PlatformNotSupported(env::consts::OS.to_string()))
     }
