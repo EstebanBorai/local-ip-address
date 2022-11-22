@@ -37,6 +37,7 @@ setup_common: &SETUP
     - rustup --version
     - cargo -Vv
     - rustc -Vv
+    - ifconfig
 
 # Cache the Cargo directory between runs
 cargo_cache:
