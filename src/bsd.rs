@@ -21,7 +21,7 @@ type IfAddrsPtr = *mut *mut ifaddrs;
 ///
 /// if let Some((_, ipaddr)) = ifas
 /// .iter()
-/// .find(|(name, ipaddr)| *name == "en0" && matches!(ipaddr, IpAddr::V4(_))) {
+/// .find(|(name, ipaddr)| (*name == "en0" || *name == "epair0b") && matches!(ipaddr, IpAddr::V4(_))) {
 ///     // This is your local IP address: 192.168.1.111
 ///     println!("This is your local IP address: {:?}", ipaddr);
 /// }
@@ -50,7 +50,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
         // To find the relevant interface address walk over the nodes of the
         // linked list looking for interface address which belong to the socket
         // address families AF_INET (IPv4) and AF_INET6 (IPv6)
-        while !(**ifa).ifa_next.is_null() {
+        loop {
             let ifa_addr = (**ifa).ifa_addr;
 
             match (*ifa_addr).sa_family as i32 {
@@ -73,9 +73,6 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
                     let name = get_ifa_name(ifa)?;
 
                     interfaces.push((name, IpAddr::V4(ip_addr)));
-
-                    *ifa = (**ifa).ifa_next;
-                    continue;
                 }
                 // AF_INET6 IPv6 protocol implementation
                 AF_INET6 => {
@@ -86,14 +83,14 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
                     let name = get_ifa_name(ifa)?;
 
                     interfaces.push((name, IpAddr::V6(ip_addr)));
+                }
+                _ => {}
+            }
 
-                    *ifa = (**ifa).ifa_next;
-                    continue;
-                }
-                _ => {
-                    *ifa = (**ifa).ifa_next;
-                    continue;
-                }
+            // Check if we are at the end of our network interface list
+            *ifa = (**ifa).ifa_next;
+            if (*ifa).is_null() {
+                break;
             }
         }
 
