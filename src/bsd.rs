@@ -1,4 +1,4 @@
-use libc::{getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, strlen, AF_INET, AF_INET6};
+use libc::{getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, strlen, AF_INET, AF_INET6, IFF_RUNNING};
 use std::alloc::{alloc, dealloc, Layout};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
@@ -56,23 +56,25 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
             match (*ifa_addr).sa_family as i32 {
                 // AF_INET IPv4 protocol implementation
                 AF_INET => {
-                    let interface_address = ifa_addr;
-                    let socket_addr_v4: *mut sockaddr_in = interface_address as *mut sockaddr_in;
-                    let in_addr = (*socket_addr_v4).sin_addr;
-                    let mut ip_addr = Ipv4Addr::from(in_addr.s_addr);
+                    if !is_loopback_addr(ifa) {
+                        let interface_address = ifa_addr;
+                        let socket_addr_v4: *mut sockaddr_in = interface_address as *mut sockaddr_in;
+                        let in_addr = (*socket_addr_v4).sin_addr;
+                        let mut ip_addr = Ipv4Addr::from(in_addr.s_addr);
 
-                    if cfg!(target_endian = "little") {
-                        // due to a difference on how bytes are arranged on a
-                        // single word of memory by the CPU, swap bytes based
-                        // on CPU endianess to avoid having twisted IP addresses
-                        //
-                        // refer: https://github.com/rust-lang/rust/issues/48819
-                        ip_addr = Ipv4Addr::from(in_addr.s_addr.swap_bytes());
+                        if cfg!(target_endian = "little") {
+                            // due to a difference on how bytes are arranged on a
+                            // single word of memory by the CPU, swap bytes based
+                            // on CPU endianess to avoid having twisted IP addresses
+                            //
+                            // refer: https://github.com/rust-lang/rust/issues/48819
+                            ip_addr = Ipv4Addr::from(in_addr.s_addr.swap_bytes());
+                        }
+
+                        let name = get_ifa_name(ifa)?;
+
+                        interfaces.push((name, IpAddr::V4(ip_addr)));
                     }
-
-                    let name = get_ifa_name(ifa)?;
-
-                    interfaces.push((name, IpAddr::V4(ip_addr)));
                 }
                 // AF_INET6 IPv6 protocol implementation
                 AF_INET6 => {
@@ -111,4 +113,11 @@ unsafe fn get_ifa_name(ifa: *mut *mut ifaddrs) -> Result<String, Error> {
             e
         ))),
     }
+}
+
+/// Determines if an interface address is a loopback address
+unsafe fn is_loopback_addr(ifa: *mut *mut ifaddrs) -> bool {
+    let iname = get_ifa_name(ifa).unwrap_or_default();
+    let iflags = (*(*ifa)).ifa_flags;
+    iname.starts_with("lo") || ((iflags as i32) & IFF_RUNNING) == 0
 }
