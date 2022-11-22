@@ -123,8 +123,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
     {
         let ifas = crate::bsd::list_afinet_netifas_info()?;
 
-        ifas
-            .into_iter()
+        ifas.into_iter()
             .filter_map(|interface| {
                 if interface.is_loopback {
                     Some(interface.addr)

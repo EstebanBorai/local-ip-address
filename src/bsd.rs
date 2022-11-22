@@ -28,11 +28,10 @@ type IfAddrsPtr = *mut *mut ifaddrs;
 /// ```
 pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
     match list_afinet_netifas_info() {
-        Ok(interfaces) => {
-            Ok(interfaces.iter().map(|i| {
-                (i.iname.clone(), i.addr)
-            }).collect())
-        },
+        Ok(interfaces) => Ok(interfaces
+            .iter()
+            .map(|i| (i.iname.clone(), i.addr))
+            .collect()),
         Err(e) => Err(e),
     }
 }
