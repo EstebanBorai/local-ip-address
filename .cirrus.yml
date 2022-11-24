@@ -1,0 +1,102 @@
+############################################################################
+# Cirrus workflow for testing on (Free)BSD.
+#
+# References:
+#   - https://cirrus-ci.org/guide/writing-tasks/
+#   - https://github.com/tokio-rs/tokio/blob/master/.cirrus.yml
+#   - https://github.com/nix-rust/nix/blob/master/.cirrus.yml
+#   - https://github.com/jakewilliami/HiddenFiles.jl/blob/master/.cirrus.yml
+#
+# TODO:
+#   - Implement tests for other BSD OS's (will need to handle setup
+#       differently for Tier 3 support OS's)
+############################################################################
+
+# Specify container (FreeBSD)
+#
+# References:
+#   - https://cirrus-ci.org/guide/writing-tasks/#execution-environment
+#   - https://cirrus-ci.org/guide/FreeBSD/
+freebsd_instance:
+  image: freebsd-13-1-release-amd64  # freebsd-12-3-release-amd64
+
+# Set up environment variables
+env:
+  # The minimum supported Rust version (MSRV)
+  # https://github.com/foresterre/cargo-msrv
+  TOOLCHAIN: 1.56.1
+
+# Define set up procedure by downloading Rustup (to consume later)
+setup_common: &SETUP
+  setup_script:
+    - kldload mqueuefs
+    - fetch https://sh.rustup.rs -o rustup.sh
+    - sh rustup.sh -y --profile=minimal --default-toolchain $TOOLCHAIN
+    - rm rustup.sh
+    - . $HOME/.cargo/env || true
+    - rustup --version
+    - cargo -Vv
+    - rustc -Vv
+    - ifconfig
+
+# Cache the Cargo directory between runs
+cargo_cache:
+  folder: $CARGO_HOME/registry
+  fingerprint_script: cat Cargo.lock || echo ""
+
+# Test Cargo Build
+task:
+  name: "Builds on FreeBSD 13"
+  <<: *SETUP
+  env:
+    RUSTFLAGS: "-D warnings"
+  test_script:
+    - . $HOME/.cargo/env || true
+    - cargo +$TOOLCHAIN build --release --all-targets
+  before_cache_script: rm -rf $CARGO_HOME/registry/index
+
+# Run Unit Tests
+task:
+  name: "Runs \"cargo test\" on FreeBSD 13"
+  <<: *SETUP
+  env:
+    RUSTFLAGS: "-D warnings"
+    RUSTDOCFLAGS: -D warnings
+  test_script:
+    - . $HOME/.cargo/env || true
+    - cargo +$TOOLCHAIN test --all --all-features -- --nocapture
+    - cargo +$TOOLCHAIN doc --no-deps
+  before_cache_script: rm -rf $CARGO_HOME/registry/index
+
+# Test Cargo Clippy
+task:
+  name: "Runs \"cargo clippy\" on FreeBSD 13"
+  <<: *SETUP
+  install_script:
+    - . $HOME/.cargo/env || true
+    - rustup component add --toolchain $TOOLCHAIN clippy
+  test_script:
+    - . $HOME/.cargo/env || true
+    - cargo +$TOOLCHAIN clippy --all-targets
+  before_cache_script: rm -rf $CARGO_HOME/registry/index
+
+# Test Cargo Fmt
+task:
+  name: "Runs \"cargo fmt\" on FreeBSD 13"
+  <<: *SETUP
+  install_script:
+    - . $HOME/.cargo/env || true
+    - rustup +$TOOLCHAIN component add rustfmt
+  test_script:
+    - . $HOME/.cargo/env || true
+    - cargo +$TOOLCHAIN fmt --all -- --check
+  before_cache_script: rm -rf $CARGO_HOME/registry/index
+
+# Test Cargo Publish
+task:
+  name: "Runs \"cargo publish --dry-run\" on FreeBSD 13"
+  <<: *SETUP
+  test_script:
+    - . $HOME/.cargo/env || true
+    - cargo +$TOOLCHAIN publish --dry-run
+  before_cache_script: rm -rf $CARGO_HOME/registry/index
