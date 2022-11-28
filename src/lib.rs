@@ -121,13 +121,18 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         target_os = "dragonfly",
     ))]
     {
-        let ifas = crate::bsd::list_afinet_netifas()?;
+        let ifas = crate::bsd::list_afinet_netifas_info()?;
 
-        if let Some((_, ipaddr)) = find_ifa(ifas, vec!["en0", "epair0b"]) {
-            return Ok(ipaddr);
-        }
-
-        Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
+        ifas.into_iter()
+            .filter_map(|interface| {
+                if interface.is_loopback {
+                    Some(interface.addr)
+                } else {
+                    None
+                }
+            })
+            .find(|ip_addr| matches!(ip_addr, IpAddr::V4(_)))
+            .ok_or_else(|| Error::PlatformNotSupported(env::consts::OS.to_string()))
     }
 
     #[cfg(target_os = "windows")]
@@ -155,14 +160,6 @@ pub fn local_ip() -> Result<IpAddr, Error> {
     {
         Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
     }
-}
-
-/// Finds the network interface with any of the provided names in the vector of network
-/// interfaces provided
-pub fn find_ifa(ifas: Vec<(String, IpAddr)>, ifa_names: Vec<&str>) -> Option<(String, IpAddr)> {
-    ifas.into_iter().find(|(name, ipaddr)| {
-        ifa_names.contains(&name.as_str()) && matches!(ipaddr, IpAddr::V4(_))
-    })
 }
 
 // A catch-all function to error if not implemented for OS

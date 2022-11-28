@@ -1,4 +1,4 @@
-use libc::{getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, strlen, AF_INET, AF_INET6};
+use libc::{getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, strlen, AF_INET, AF_INET6, IFF_RUNNING};
 use std::alloc::{alloc, dealloc, Layout};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
@@ -27,6 +27,24 @@ type IfAddrsPtr = *mut *mut ifaddrs;
 /// }
 /// ```
 pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
+    match list_afinet_netifas_info() {
+        Ok(interfaces) => Ok(interfaces
+            .iter()
+            .map(|i| (i.iname.clone(), i.addr))
+            .collect()),
+        Err(e) => Err(e),
+    }
+}
+
+pub struct AfInetInfo {
+    pub addr: IpAddr,
+    pub iname: String,
+    pub is_loopback: bool,
+}
+
+// Internal methos to list AF_INET info in a struct.  This metho is used by
+// list_afiinet_netifas and local_ip,
+pub fn list_afinet_netifas_info() -> Result<Vec<AfInetInfo>, Error> {
     unsafe {
         let layout = Layout::new::<IfAddrsPtr>();
         let ptr = alloc(layout);
@@ -41,7 +59,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
             )));
         }
 
-        let mut interfaces: Vec<(String, IpAddr)> = Vec::new();
+        let mut interfaces: Vec<AfInetInfo> = Vec::new();
         let ifa = myaddr;
 
         // An instance of `ifaddrs` is build on top of a linked list where
@@ -70,9 +88,11 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
                         ip_addr = Ipv4Addr::from(in_addr.s_addr.swap_bytes());
                     }
 
-                    let name = get_ifa_name(ifa)?;
-
-                    interfaces.push((name, IpAddr::V4(ip_addr)));
+                    interfaces.push(AfInetInfo {
+                        addr: IpAddr::V4(ip_addr),
+                        iname: get_ifa_name(ifa)?,
+                        is_loopback: is_loopback_addr(ifa),
+                    });
                 }
                 // AF_INET6 IPv6 protocol implementation
                 AF_INET6 => {
@@ -80,9 +100,12 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
                     let socket_addr_v6: *mut sockaddr_in6 = interface_address as *mut sockaddr_in6;
                     let in6_addr = (*socket_addr_v6).sin6_addr;
                     let ip_addr = Ipv6Addr::from(in6_addr.s6_addr);
-                    let name = get_ifa_name(ifa)?;
 
-                    interfaces.push((name, IpAddr::V6(ip_addr)));
+                    interfaces.push(AfInetInfo {
+                        addr: IpAddr::V6(ip_addr),
+                        iname: get_ifa_name(ifa)?,
+                        is_loopback: is_loopback_addr(ifa),
+                    });
                 }
                 _ => {}
             }
@@ -111,4 +134,11 @@ unsafe fn get_ifa_name(ifa: *mut *mut ifaddrs) -> Result<String, Error> {
             e
         ))),
     }
+}
+
+/// Determines if an interface address is a loopback address
+unsafe fn is_loopback_addr(ifa: *mut *mut ifaddrs) -> bool {
+    let iname = get_ifa_name(ifa).unwrap_or_default();
+    let iflags = (*(*ifa)).ifa_flags;
+    iname.starts_with("lo") || ((iflags as i32) & IFF_RUNNING) == 0
 }
