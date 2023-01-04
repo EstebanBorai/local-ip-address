@@ -1,4 +1,5 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
 use neli::attr::Attribute;
 use neli::consts::nl::{NlmF, NlmFFlags};
 use neli::consts::socket::NlFamily;
