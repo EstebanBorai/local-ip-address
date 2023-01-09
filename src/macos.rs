@@ -1,7 +1,7 @@
 use std::alloc::{alloc, dealloc, Layout};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use libc::{getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, strlen, AF_INET, AF_INET6, IFF_RUNNING};
+use libc::{getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, strlen, AF_INET, AF_INET6};
 
 use crate::Error;
 
@@ -22,30 +22,12 @@ type IfAddrsPtr = *mut *mut ifaddrs;
 ///
 /// if let Some((_, ipaddr)) = ifas
 /// .iter()
-/// .find(|(name, ipaddr)| (*name == "en0" || *name == "epair0b") && matches!(ipaddr, IpAddr::V4(_))) {
+/// .find(|(name, ipaddr)| *name == "en0" && matches!(ipaddr, IpAddr::V4(_))) {
 ///     // This is your local IP address: 192.168.1.111
 ///     println!("This is your local IP address: {:?}", ipaddr);
 /// }
 /// ```
 pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
-    match list_afinet_netifas_info() {
-        Ok(interfaces) => Ok(interfaces
-            .iter()
-            .map(|i| (i.iname.clone(), i.addr))
-            .collect()),
-        Err(e) => Err(e),
-    }
-}
-
-pub struct AfInetInfo {
-    pub addr: IpAddr,
-    pub iname: String,
-    pub is_loopback: bool,
-}
-
-// Internal methos to list AF_INET info in a struct.  This metho is used by
-// list_afiinet_netifas and local_ip,
-pub fn list_afinet_netifas_info() -> Result<Vec<AfInetInfo>, Error> {
     unsafe {
         let layout = Layout::new::<IfAddrsPtr>();
         let ptr = alloc(layout);
@@ -60,7 +42,7 @@ pub fn list_afinet_netifas_info() -> Result<Vec<AfInetInfo>, Error> {
             )));
         }
 
-        let mut interfaces: Vec<AfInetInfo> = Vec::new();
+        let mut interfaces: Vec<(String, IpAddr)> = Vec::new();
         let ifa = myaddr;
 
         // An instance of `ifaddrs` is build on top of a linked list where
@@ -69,7 +51,7 @@ pub fn list_afinet_netifas_info() -> Result<Vec<AfInetInfo>, Error> {
         // To find the relevant interface address walk over the nodes of the
         // linked list looking for interface address which belong to the socket
         // address families AF_INET (IPv4) and AF_INET6 (IPv6)
-        loop {
+        while !(**ifa).ifa_next.is_null() {
             let ifa_addr = (**ifa).ifa_addr;
 
             match (*ifa_addr).sa_family as i32 {
@@ -89,11 +71,12 @@ pub fn list_afinet_netifas_info() -> Result<Vec<AfInetInfo>, Error> {
                         ip_addr = Ipv4Addr::from(in_addr.s_addr.swap_bytes());
                     }
 
-                    interfaces.push(AfInetInfo {
-                        addr: IpAddr::V4(ip_addr),
-                        iname: get_ifa_name(ifa)?,
-                        is_loopback: is_loopback_addr(ifa),
-                    });
+                    let name = get_ifa_name(ifa)?;
+
+                    interfaces.push((name, IpAddr::V4(ip_addr)));
+
+                    *ifa = (**ifa).ifa_next;
+                    continue;
                 }
                 // AF_INET6 IPv6 protocol implementation
                 AF_INET6 => {
@@ -101,20 +84,17 @@ pub fn list_afinet_netifas_info() -> Result<Vec<AfInetInfo>, Error> {
                     let socket_addr_v6: *mut sockaddr_in6 = interface_address as *mut sockaddr_in6;
                     let in6_addr = (*socket_addr_v6).sin6_addr;
                     let ip_addr = Ipv6Addr::from(in6_addr.s6_addr);
+                    let name = get_ifa_name(ifa)?;
 
-                    interfaces.push(AfInetInfo {
-                        addr: IpAddr::V6(ip_addr),
-                        iname: get_ifa_name(ifa)?,
-                        is_loopback: is_loopback_addr(ifa),
-                    });
+                    interfaces.push((name, IpAddr::V6(ip_addr)));
+
+                    *ifa = (**ifa).ifa_next;
+                    continue;
                 }
-                _ => {}
-            }
-
-            // Check if we are at the end of our network interface list
-            *ifa = (**ifa).ifa_next;
-            if (*ifa).is_null() {
-                break;
+                _ => {
+                    *ifa = (**ifa).ifa_next;
+                    continue;
+                }
             }
         }
 
@@ -135,11 +115,4 @@ unsafe fn get_ifa_name(ifa: *mut *mut ifaddrs) -> Result<String, Error> {
             e
         ))),
     }
-}
-
-/// Determines if an interface address is a loopback address
-unsafe fn is_loopback_addr(ifa: *mut *mut ifaddrs) -> bool {
-    let iname = get_ifa_name(ifa).unwrap_or_default();
-    let iflags = (*(*ifa)).ifa_flags;
-    iname.starts_with("lo") || ((iflags as i32) & IFF_RUNNING) == 0
 }
