@@ -145,7 +145,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
 
         if let Some((_, ip_addr)) = ifas
             .into_iter()
-            .find(|(name, ipaddr)| name == "en0" && matches!(ipaddr, IpAddr::V4(_)))
+            .find(|(name, ipaddr)| name.starts_with("en") && matches!(ipaddr, IpAddr::V4(_)))
         {
             Ok(ip_addr)
         } else {
