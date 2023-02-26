@@ -3,9 +3,11 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use neli::attr::Attribute;
 use neli::consts::nl::{NlmF, NlmFFlags};
 use neli::consts::socket::NlFamily;
-use neli::consts::rtnl::{Ifa, IfaFFlags, RtAddrFamily, RtScope, Rtm};
+use neli::consts::rtnl::{
+    Ifa, IfaFFlags, RtAddrFamily, RtScope, Rtm, RtTable, Rtprot, Rtn, RtmFFlags, RtmF, Rta,
+};
 use neli::nl::{NlPayload, Nlmsghdr};
-use neli::rtnl::Ifaddrmsg;
+use neli::rtnl::{Ifaddrmsg, Rtattr, Rtmsg};
 use neli::socket::NlSocketHandle;
 use neli::types::RtBuffer;
 use libc::{freeifaddrs, getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, strlen, AF_INET, AF_INET6};
@@ -34,10 +36,83 @@ fn make_netlink_message(ifaddrmsg: NlPayload<Ifaddrmsg>) -> Nlmsghdr<Rtm, NlPayl
     )
 }
 
-/// Retrieves the local IP address fo this system
+/// Retrieves the local IP address for this system
 pub fn local_ip() -> Result<IpAddr, Error> {
     let mut netlink_socket = NlSocketHandle::connect(NlFamily::Route, None, &[])
         .map_err(|err| Error::StrategyError(err.to_string()))?;
+
+    let dstip = Ipv4Addr::new(192, 0, 2, 0); // reserved external IP
+    let raw_dstip = u32::from(dstip).to_be();
+    let route_attr = Rtattr::new(None, Rta::Dst, raw_dstip)
+        .map_err(|err| Error::StrategyError(err.to_string()))?;
+    let mut route_payload = RtBuffer::new();
+    route_payload.push(route_attr);
+    let ifroutemsg = Rtmsg {
+        rtm_family: RtAddrFamily::Inet,
+        rtm_dst_len: 0,
+        rtm_src_len: 0,
+        rtm_tos: 0,
+        rtm_table: RtTable::Unspec,
+        rtm_protocol: Rtprot::Unspec,
+        rtm_scope: RtScope::Universe,
+        rtm_type: Rtn::Unspec,
+        rtm_flags: RtmFFlags::new(&[RtmF::LookupTable]),
+        rtattrs: route_payload,
+    };
+    let netlink_message = Nlmsghdr::new(
+        None,
+        Rtm::Getroute,
+        NlmFFlags::new(&[NlmF::Request]),
+        None,
+        None,
+        NlPayload::Payload(ifroutemsg),
+    );
+
+    netlink_socket
+        .send(netlink_message)
+        .map_err(|err| Error::StrategyError(err.to_string()))?;
+
+    for response in netlink_socket.iter(false) {
+        let header: Nlmsghdr<_, Rtmsg> = response.map_err(|_| {
+            Error::StrategyError(String::from(
+                "An error ocurred retrieving Netlink's socket response",
+            ))
+        })?;
+
+        if let NlPayload::Empty = header.nl_payload {
+            continue;
+        }
+
+        if header.nl_type != Rtm::Newroute.into() {
+            return Err(Error::StrategyError(String::from(
+                "The Netlink header type is not the expected",
+            )));
+        }
+
+        let p = header.get_payload().map_err(|_| {
+            Error::StrategyError(String::from(
+                "An error ocurred getting Netlink's header payload",
+            ))
+        })?;
+
+        if p.rtm_scope != RtScope::Universe {
+            continue;
+        }
+
+        for rtattr in p.rtattrs.iter() {
+            if rtattr.rta_type == Rta::Prefsrc {
+                let addr = Ipv4Addr::from(u32::from_be(rtattr.get_payload_as::<u32>().map_err(
+                    |_| {
+                        Error::StrategyError(String::from(
+                            "An error ocurred retrieving Netlink's route payload attribute",
+                        ))
+                    },
+                )?));
+                return Ok(IpAddr::V4(addr));
+            }
+        }
+    }
+
     let ifaddrmsg = make_ifaddrmsg();
     let netlink_payload = NlPayload::Payload(ifaddrmsg);
     let netlink_message = make_netlink_message(netlink_payload);
@@ -45,8 +120,6 @@ pub fn local_ip() -> Result<IpAddr, Error> {
     netlink_socket
         .send(netlink_message)
         .map_err(|err| Error::StrategyError(err.to_string()))?;
-
-    let mut addrs = Vec::<Ipv4Addr>::with_capacity(1);
 
     for response in netlink_socket.iter(false) {
         let header: Nlmsghdr<_, Ifaddrmsg> = response.map_err(|_| {
@@ -77,21 +150,16 @@ pub fn local_ip() -> Result<IpAddr, Error> {
 
         for rtattr in p.rtattrs.iter() {
             if rtattr.rta_type == Ifa::Local {
-                addrs.push(Ipv4Addr::from(u32::from_be(
-                    rtattr.get_payload_as::<u32>().map_err(|_| {
+                let addr = Ipv4Addr::from(u32::from_be(rtattr.get_payload_as::<u32>().map_err(
+                    |_| {
                         Error::StrategyError(String::from(
                             "An error ocurred retrieving Netlink's route payload attribute",
                         ))
-                    })?,
-                )));
+                    },
+                )?));
+                return Ok(IpAddr::V4(addr));
             }
         }
-    }
-
-    if let Some(local_ip) = addrs.first() {
-        let ipaddr = IpAddr::V4(local_ip.to_owned());
-
-        return Ok(ipaddr);
     }
 
     Err(Error::LocalIpAddressNotFound)
