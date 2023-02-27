@@ -14,28 +14,6 @@ use libc::{freeifaddrs, getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, strlen, 
 
 use crate::Error;
 
-fn make_ifaddrmsg() -> Ifaddrmsg {
-    Ifaddrmsg {
-        ifa_family: RtAddrFamily::Inet,
-        ifa_prefixlen: 0,
-        ifa_flags: IfaFFlags::empty(),
-        ifa_scope: 0,
-        ifa_index: 0,
-        rtattrs: RtBuffer::new(),
-    }
-}
-
-fn make_netlink_message(ifaddrmsg: NlPayload<Ifaddrmsg>) -> Nlmsghdr<Rtm, NlPayload<Ifaddrmsg>> {
-    Nlmsghdr::new(
-        None,
-        Rtm::Getaddr,
-        NlmFFlags::new(&[NlmF::Request, NlmF::Root]),
-        None,
-        None,
-        NlPayload::Payload(ifaddrmsg),
-    )
-}
-
 /// Retrieves the local IP address for this system
 pub fn local_ip() -> Result<IpAddr, Error> {
     let mut netlink_socket = NlSocketHandle::connect(NlFamily::Route, None, &[])
@@ -73,7 +51,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         .map_err(|err| Error::StrategyError(err.to_string()))?;
 
     for response in netlink_socket.iter(false) {
-        let header: Nlmsghdr<_, Rtmsg> = response.map_err(|_| {
+        let header: Nlmsghdr<Rtm, Rtmsg> = response.map_err(|_| {
             Error::StrategyError(String::from(
                 "An error ocurred retrieving Netlink's socket response",
             ))
@@ -83,7 +61,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
             continue;
         }
 
-        if header.nl_type != Rtm::Newroute.into() {
+        if header.nl_type != Rtm::Newroute {
             return Err(Error::StrategyError(String::from(
                 "The Netlink header type is not the expected",
             )));
@@ -113,16 +91,29 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         }
     }
 
-    let ifaddrmsg = make_ifaddrmsg();
-    let netlink_payload = NlPayload::Payload(ifaddrmsg);
-    let netlink_message = make_netlink_message(netlink_payload);
+    let ifaddrmsg = Ifaddrmsg {
+        ifa_family: RtAddrFamily::Inet,
+        ifa_prefixlen: 0,
+        ifa_flags: IfaFFlags::empty(),
+        ifa_scope: 0,
+        ifa_index: 0,
+        rtattrs: RtBuffer::new(),
+    };
+    let netlink_message = Nlmsghdr::new(
+        None,
+        Rtm::Getaddr,
+        NlmFFlags::new(&[NlmF::Request, NlmF::Root]),
+        None,
+        None,
+        NlPayload::Payload(ifaddrmsg),
+    );
 
     netlink_socket
         .send(netlink_message)
         .map_err(|err| Error::StrategyError(err.to_string()))?;
 
     for response in netlink_socket.iter(false) {
-        let header: Nlmsghdr<_, Ifaddrmsg> = response.map_err(|_| {
+        let header: Nlmsghdr<Rtm, Ifaddrmsg> = response.map_err(|_| {
             Error::StrategyError(String::from(
                 "An error ocurred retrieving Netlink's socket response",
             ))
@@ -132,7 +123,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
             continue;
         }
 
-        if header.nl_type != Rtm::Newaddr.into() {
+        if header.nl_type != Rtm::Newaddr {
             return Err(Error::StrategyError(String::from(
                 "The Netlink header type is not the expected",
             )));

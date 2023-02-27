@@ -20,7 +20,7 @@ thiserror = "1"
 libc = "0.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-neli = "0.5"
+neli = "0.6"
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.42.0"
