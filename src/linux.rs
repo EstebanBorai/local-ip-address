@@ -55,7 +55,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
     for response in netlink_socket.iter(false) {
         let header: Nlmsghdr<Rtm, Rtmsg> = response.map_err(|_| {
             Error::StrategyError(String::from(
-                "An error ocurred retrieving Netlink's socket response",
+                "An error occurred retrieving Netlink's socket response",
             ))
         })?;
 
@@ -71,7 +71,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
 
         let p = header.get_payload().map_err(|_| {
             Error::StrategyError(String::from(
-                "An error ocurred getting Netlink's header payload",
+                "An error occurred getting Netlink's header payload",
             ))
         })?;
 
@@ -84,7 +84,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
                 let addr = Ipv4Addr::from(u32::from_be(rtattr.get_payload_as::<u32>().map_err(
                     |_| {
                         Error::StrategyError(String::from(
-                            "An error ocurred retrieving Netlink's route payload attribute",
+                            "An error occurred retrieving Netlink's route payload attribute",
                         ))
                     },
                 )?));
@@ -117,7 +117,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
     for response in netlink_socket.iter(false) {
         let header: Nlmsghdr<Rtm, Ifaddrmsg> = response.map_err(|_| {
             Error::StrategyError(String::from(
-                "An error ocurred retrieving Netlink's socket response",
+                "An error occurred retrieving Netlink's socket response",
             ))
         })?;
 
@@ -133,7 +133,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
 
         let p = header.get_payload().map_err(|_| {
             Error::StrategyError(String::from(
-                "An error ocurred getting Netlink's header payload",
+                "An error occurred getting Netlink's header payload",
             ))
         })?;
 
@@ -146,7 +146,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
                 let addr = Ipv4Addr::from(u32::from_be(rtattr.get_payload_as::<u32>().map_err(
                     |_| {
                         Error::StrategyError(String::from(
-                            "An error ocurred retrieving Netlink's route payload attribute",
+                            "An error occurred retrieving Netlink's route payload attribute",
                         ))
                     },
                 )?));

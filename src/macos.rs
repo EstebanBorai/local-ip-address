@@ -35,7 +35,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
         let getifaddrs_result = getifaddrs(myaddr);
 
         if getifaddrs_result != 0 {
-            // an error ocurred on getifaddrs
+            // an error occurred on getifaddrs
             return Err(Error::StrategyError(format!(
                 "GetIfAddrs returned error: {}",
                 getifaddrs_result
@@ -65,7 +65,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
                     if cfg!(target_endian = "little") {
                         // due to a difference on how bytes are arranged on a
                         // single word of memory by the CPU, swap bytes based
-                        // on CPU endianess to avoid having twisted IP addresses
+                        // on CPU endianness to avoid having twisted IP addresses
                         //
                         // refer: https://github.com/rust-lang/rust/issues/48819
                         ip_addr = Ipv4Addr::from(in_addr.s_addr.swap_bytes());

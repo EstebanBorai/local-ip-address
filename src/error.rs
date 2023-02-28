@@ -6,9 +6,9 @@ pub enum Error {
     LocalIpAddressNotFound,
     /// Returned when an error occurs in the strategy level.
     /// The error message may include any internal strategy error if available
-    #[error("An error ocurred executing the underlying strategy error.\n{0}")]
+    #[error("An error occurred executing the underlying strategy error.\n{0}")]
     StrategyError(String),
     /// Returned when the current platform is not yet supported
-    #[error("The current platform: `{0}`, is not suppported")]
+    #[error("The current platform: `{0}`, is not supported")]
     PlatformNotSupported(String),
 }
