@@ -1,9 +1,14 @@
-use local_ip_address::{list_afinet_netifas, local_ip};
+use local_ip_address::{list_afinet_netifas, local_ip, local_ipv6};
 
 fn main() {
     match local_ip() {
-        Ok(ip) => println!("Local IP: {}", ip),
-        Err(err) => println!("Failed to get local IP: {}", err),
+        Ok(ip) => println!("Local IPv4: {}", ip),
+        Err(err) => println!("Failed to get local IPv4: {}", err),
+    };
+
+    match local_ipv6() {
+        Ok(ip) => println!("Local IPv6: {}", ip),
+        Err(err) => println!("Failed to get local IPv6: {}", err),
     };
 
     match list_afinet_netifas() {
