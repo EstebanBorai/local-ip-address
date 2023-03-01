@@ -43,7 +43,7 @@ pub struct AfInetInfo {
     pub is_loopback: bool,
 }
 
-// Internal methos to list AF_INET info in a struct.  This metho is used by
+// Internal method to list AF_INET info in a struct.  This metho is used by
 // list_afiinet_netifas and local_ip,
 pub fn list_afinet_netifas_info() -> Result<Vec<AfInetInfo>, Error> {
     unsafe {
@@ -53,7 +53,7 @@ pub fn list_afinet_netifas_info() -> Result<Vec<AfInetInfo>, Error> {
         let getifaddrs_result = getifaddrs(myaddr);
 
         if getifaddrs_result != 0 {
-            // an error ocurred on getifaddrs
+            // an error occurred on getifaddrs
             return Err(Error::StrategyError(format!(
                 "GetIfAddrs returned error: {}",
                 getifaddrs_result
@@ -83,7 +83,7 @@ pub fn list_afinet_netifas_info() -> Result<Vec<AfInetInfo>, Error> {
                     if cfg!(target_endian = "little") {
                         // due to a difference on how bytes are arranged on a
                         // single word of memory by the CPU, swap bytes based
-                        // on CPU endianess to avoid having twisted IP addresses
+                        // on CPU endianness to avoid having twisted IP addresses
                         //
                         // refer: https://github.com/rust-lang/rust/issues/48819
                         ip_addr = Ipv4Addr::from(in_addr.s_addr.swap_bytes());

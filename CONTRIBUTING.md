@@ -16,7 +16,7 @@ project.
 
 Not all interactions that require remediation are clear violations
 of the Code of Conduct. Project maintainers will take appropriate
-action, when neccessary, to ensure the zwnbsp community is a space
+action, when necessary, to ensure the zwnbsp community is a space
 where individuals can comfortably collaborate and bring their
 entire selves. Unfortunately, if bringing your entire self is
 infringing on others from doing the same, you may be asked to leave.
