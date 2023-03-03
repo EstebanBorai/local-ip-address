@@ -192,7 +192,7 @@ fn get_adapter_addresses(
 
         let result = unsafe {
             GetAdaptersAddresses(
-                family,
+                family as u32,
                 flags,
                 ptr::null_mut(),
                 adapter_addresses.ptr.as_ptr(),
@@ -215,7 +215,7 @@ fn get_adapter_addresses(
 
 /// Converts a Windows socket address to an ip address.
 fn get_ip_address_from_socket_address(socket_address: NonNull<SOCKADDR>) -> Option<IpAddr> {
-    let socket_address_family = u32::from(unsafe { socket_address.as_ref().sa_family });
+    let socket_address_family = u32::from(unsafe { socket_address.as_ref().sa_family }) as u16;
 
     if socket_address_family == AF_INET {
         let socket_address = unsafe { socket_address.cast::<SOCKADDR_IN>().as_ref() };
