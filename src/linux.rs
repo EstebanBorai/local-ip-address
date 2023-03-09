@@ -235,7 +235,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
 
         for rtattr in p.rtattrs.iter() {
             if rtattr.rta_type == Ifla::Ifname {
-                let ifname = String::from_utf8_lossy(rtattr.payload().as_ref()).to_string();
+                let ifname = parse_ifname(rtattr.payload().as_ref());
                 if_indexes.insert(p.ifi_index, ifname);
                 break;
             }
@@ -305,7 +305,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
 
         for rtattr in p.rtattrs.iter() {
             if rtattr.rta_type == Ifa::Label {
-                let ifname = String::from_utf8_lossy(rtattr.payload().as_ref()).to_string();
+                let ifname = parse_ifname(rtattr.payload().as_ref());
                 if_indexes.insert(p.ifa_index, ifname);
             } else if rtattr.rta_type == Ifa::Address {
                 if ipaddr.is_some() {
@@ -362,4 +362,15 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
     }
 
     Ok(interfaces)
+}
+
+fn parse_ifname(bytes: &[u8]) -> Result<String, Error> {
+    CStr::from_bytes_with_nul(bytes)
+        .map_err(|_| {
+            Error::StrategyError(String::from(
+                "An error occurred convert interface name to string",
+            ))
+        })?
+        .to_string_lossy()
+        .to_string()
 }
