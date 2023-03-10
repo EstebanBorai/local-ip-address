@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ffi::CStr;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use neli::attr::Attribute;
@@ -235,7 +236,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
 
         for rtattr in p.rtattrs.iter() {
             if rtattr.rta_type == Ifla::Ifname {
-                let ifname = parse_ifname(rtattr.payload().as_ref());
+                let ifname = parse_ifname(rtattr.payload().as_ref())?;
                 if_indexes.insert(p.ifi_index, ifname);
                 break;
             }
@@ -305,7 +306,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
 
         for rtattr in p.rtattrs.iter() {
             if rtattr.rta_type == Ifa::Label {
-                let ifname = parse_ifname(rtattr.payload().as_ref());
+                let ifname = parse_ifname(rtattr.payload().as_ref())?;
                 if_indexes.insert(p.ifa_index, ifname);
             } else if rtattr.rta_type == Ifa::Address {
                 if ipaddr.is_some() {
@@ -365,12 +366,13 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
 }
 
 fn parse_ifname(bytes: &[u8]) -> Result<String, Error> {
-    CStr::from_bytes_with_nul(bytes)
+    let ifname = CStr::from_bytes_with_nul(bytes)
         .map_err(|_| {
             Error::StrategyError(String::from(
                 "An error occurred convert interface name to string",
             ))
         })?
         .to_string_lossy()
-        .to_string()
+        .to_string();
+    Ok(ifname)
 }
