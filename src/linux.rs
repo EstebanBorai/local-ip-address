@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ffi::CStr;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use neli::attr::Attribute;
@@ -235,7 +236,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
 
         for rtattr in p.rtattrs.iter() {
             if rtattr.rta_type == Ifla::Ifname {
-                let ifname = String::from_utf8_lossy(rtattr.payload().as_ref()).to_string();
+                let ifname = parse_ifname(rtattr.payload().as_ref())?;
                 if_indexes.insert(p.ifi_index, ifname);
                 break;
             }
@@ -305,7 +306,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
 
         for rtattr in p.rtattrs.iter() {
             if rtattr.rta_type == Ifa::Label {
-                let ifname = String::from_utf8_lossy(rtattr.payload().as_ref()).to_string();
+                let ifname = parse_ifname(rtattr.payload().as_ref())?;
                 if_indexes.insert(p.ifa_index, ifname);
             } else if rtattr.rta_type == Ifa::Address {
                 if ipaddr.is_some() {
@@ -362,4 +363,55 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
     }
 
     Ok(interfaces)
+}
+
+/// Parse network interface name of slice type to string type.
+/// If the slice is suffixed with '\0', this suffix will be removed when parsing.
+fn parse_ifname(bytes: &[u8]) -> Result<String, Error> {
+    let ifname = if bytes.ends_with(&[0u8]) {
+        CStr::from_bytes_with_nul(bytes)
+            .map_err(|err| {
+                Error::StrategyError(format!(
+                    "An error occurred converting interface name to string: {err}",
+                ))
+            })?
+            .to_string_lossy()
+            .to_string()
+    } else {
+        String::from_utf8_lossy(bytes).to_string()
+    };
+
+    Ok(ifname)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::linux::parse_ifname;
+
+    #[test]
+    fn parse_ifname_without_nul() {
+        let expected = "hello, world";
+        let bytes = [104, 101, 108, 108, 111, 44, 32, 119, 111, 114, 108, 100];
+        let res = parse_ifname(&bytes);
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap(), expected);
+    }
+
+    #[test]
+    fn parse_ifname_with_nul() {
+        let expected = "hello, world";
+        let bytes = [104, 101, 108, 108, 111, 44, 32, 119, 111, 114, 108, 100, 0];
+        let res = parse_ifname(&bytes);
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap(), expected);
+    }
+
+    #[test]
+    fn parse_ifname_only_nul() {
+        let expected = "";
+        let bytes = [0u8];
+        let res = parse_ifname(&bytes);
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap(), expected);
+    }
 }
