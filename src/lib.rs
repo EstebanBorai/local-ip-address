@@ -53,15 +53,7 @@ Supported BSD-based systems include:
   - NetBSD
   - DragonFly
 */
-#[cfg(any(
-    target_os = "windows",
-    target_os = "macos",
-    target_os = "freebsd",
-    target_os = "openbsd",
-    target_os = "netbsd",
-    target_os = "dragonfly",
-))]
-use std::env;
+
 use std::net::IpAddr;
 
 mod error;
@@ -136,7 +128,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
                 }
             })
             .find(|ip_addr| matches!(ip_addr, IpAddr::V4(_)))
-            .ok_or_else(|| Error::PlatformNotSupported(env::consts::OS.to_string()))
+            .ok_or_else(|| Error::PlatformNotSupported(std::env::consts::OS.to_string()))
     }
 
     #[cfg(target_os = "macos")]
@@ -149,7 +141,9 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         {
             Ok(ip_addr)
         } else {
-            Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
+            Err(Error::PlatformNotSupported(
+                std::env::consts::OS.to_string(),
+            ))
         }
     }
 
@@ -162,7 +156,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         ip_addresses
             .into_iter()
             .find(|ip_address| matches!(ip_address, IpAddr::V4(_)))
-            .ok_or_else(|| Error::PlatformNotSupported(env::consts::OS.to_string()))
+            .ok_or_else(|| Error::PlatformNotSupported(std::env::consts::OS.to_string()))
     }
 
     // A catch-all case to error if not implemented for OS
@@ -176,7 +170,9 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         target_os = "dragonfly",
     )))]
     {
-        Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
+        Err(Error::PlatformNotSupported(
+            std::env::consts::OS.to_string(),
+        ))
     }
 }
 
@@ -191,7 +187,9 @@ pub fn local_ip() -> Result<IpAddr, Error> {
     target_os = "dragonfly",
 )))]
 pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
-    Err(Error::PlatformNotSupported(env::consts::OS.to_string()))
+    Err(Error::PlatformNotSupported(
+        std::env::consts::OS.to_string(),
+    ))
 }
 
 mod tests {

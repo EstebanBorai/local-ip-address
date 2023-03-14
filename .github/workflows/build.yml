@@ -8,23 +8,44 @@ on:
 
 jobs:
   build:
-    name: Builds on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Builds on ${{ matrix.os }} with ${{ matrix.target }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [
-          ubuntu-latest,
-          windows-latest,
-          macOS-latest
-        ]
+        include:
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - target: x86_64-pc-windows-gnu
+            os: windows-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: arm-unknown-linux-musleabi
+            os: ubuntu-latest
+          - target: arm-unknown-linux-musleabihf
+            os: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v1
+      - name: Checkout
+        uses: actions/checkout@v3
 
-      - uses: actions-rs/toolchain@v1
+      - name: Rust Toolchain Setup
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
+          override: true
+          target: ${{ matrix.target }}
 
       - name: Build
-        run: cargo build --release
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: ${{ matrix.os == 'ubuntu-latest' }}
+          command: build
+          args: --target=${{ matrix.target }} --all-targets --release

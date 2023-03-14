@@ -17,6 +17,11 @@ use neli::consts::rtnl::RtAddrFamily::{Inet, Inet6};
 
 use crate::Error;
 
+#[cfg(target_env = "gnu")]
+const RTM_FLAGS_LOOKUP: &[RtmF] = &[RtmF::LookupTable];
+#[cfg(not(target_env = "gnu"))]
+const RTM_FLAGS_LOOKUP: &[RtmF] = &[];
+
 /// Retrieves the local IP address for this system
 pub fn local_ip() -> Result<IpAddr, Error> {
     let mut netlink_socket = NlSocketHandle::connect(NlFamily::Route, None, &[])
@@ -37,7 +42,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         rtm_protocol: Rtprot::Unspec,
         rtm_scope: RtScope::Universe,
         rtm_type: Rtn::Unspec,
-        rtm_flags: RtmFFlags::new(&[RtmF::LookupTable]),
+        rtm_flags: RtmFFlags::new(RTM_FLAGS_LOOKUP),
         rtattrs: route_payload,
     };
     let netlink_message = Nlmsghdr::new(
@@ -193,7 +198,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
         rtm_protocol: Rtprot::Unspec,
         rtm_scope: RtScope::Universe,
         rtm_type: Rtn::Unspec,
-        rtm_flags: RtmFFlags::new(&[RtmF::LookupTable]),
+        rtm_flags: RtmFFlags::new(RTM_FLAGS_LOOKUP),
         rtattrs: RtBuffer::new(),
     };
     let netlink_message = Nlmsghdr::new(
@@ -254,7 +259,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
         rtm_protocol: Rtprot::Unspec,
         rtm_scope: RtScope::Universe,
         rtm_type: Rtn::Unspec,
-        rtm_flags: RtmFFlags::new(&[RtmF::LookupTable]),
+        rtm_flags: RtmFFlags::new(RTM_FLAGS_LOOKUP),
         rtattrs: RtBuffer::new(),
     };
     let netlink_message = Nlmsghdr::new(
