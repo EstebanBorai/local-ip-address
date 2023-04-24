@@ -43,7 +43,7 @@ may differ based on the running operative system.
 OS | Approach
 --- | ---
 Linux | Establishes a Netlink socket interchange to retrieve network interfaces
-BSD-based | Uses of `getifaddrs` to retrieve network interfaces
+BSD-based & Android | Uses of `getifaddrs` to retrieve network interfaces
 Windows | Consumes Win32 API's to retrieve the network adapters table
 
 Supported BSD-based systems include:
@@ -70,22 +70,20 @@ pub use crate::linux::*;
     target_os = "openbsd",
     target_os = "netbsd",
     target_os = "dragonfly",
+    target_os = "macos",
+    target_os = "android",
 ))]
-pub mod bsd;
+pub mod unix;
 
 #[cfg(any(
     target_os = "freebsd",
     target_os = "openbsd",
     target_os = "netbsd",
     target_os = "dragonfly",
+    target_os = "macos",
+    target_os = "android",
 ))]
-pub use crate::bsd::*;
-
-#[cfg(target_os = "macos")]
-pub mod macos;
-
-#[cfg(target_os = "macos")]
-pub use crate::macos::*;
+pub use crate::unix::*;
 
 #[cfg(target_family = "windows")]
 pub mod windows;
@@ -115,36 +113,21 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         target_os = "openbsd",
         target_os = "netbsd",
         target_os = "dragonfly",
+        target_os = "macos",
+        target_os = "android",
     ))]
     {
-        let ifas = crate::bsd::list_afinet_netifas_info()?;
+        let ifas = crate::unix::list_afinet_netifas_info()?;
 
         ifas.into_iter()
-            .filter_map(|interface| {
-                if interface.is_loopback {
-                    Some(interface.addr)
+            .find_map(|ifa| {
+                if !ifa.is_loopback && ifa.addr.is_ipv4() {
+                    Some(ifa.addr)
                 } else {
                     None
                 }
             })
-            .find(|ip_addr| matches!(ip_addr, IpAddr::V4(_)))
-            .ok_or_else(|| Error::PlatformNotSupported(std::env::consts::OS.to_string()))
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        let ifas = crate::macos::list_afinet_netifas()?;
-
-        if let Some((_, ip_addr)) = ifas
-            .into_iter()
-            .find(|(name, ipaddr)| name == "en0" && matches!(ipaddr, IpAddr::V4(_)))
-        {
-            Ok(ip_addr)
-        } else {
-            Err(Error::PlatformNotSupported(
-                std::env::consts::OS.to_string(),
-            ))
-        }
+            .ok_or(Error::LocalIpAddressNotFound)
     }
 
     #[cfg(target_os = "windows")]
@@ -156,7 +139,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         ip_addresses
             .into_iter()
             .find(|ip_address| matches!(ip_address, IpAddr::V4(_)))
-            .ok_or_else(|| Error::PlatformNotSupported(std::env::consts::OS.to_string()))
+            .ok_or(Error::LocalIpAddressNotFound)
     }
 
     // A catch-all case to error if not implemented for OS
@@ -168,6 +151,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         target_os = "openbsd",
         target_os = "netbsd",
         target_os = "dragonfly",
+        target_os = "android",
     )))]
     {
         Err(Error::PlatformNotSupported(
@@ -185,6 +169,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
     target_os = "openbsd",
     target_os = "netbsd",
     target_os = "dragonfly",
+    target_os = "android",
 )))]
 pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
     Err(Error::PlatformNotSupported(
@@ -211,21 +196,14 @@ mod tests {
         target_os = "openbsd",
         target_os = "netbsd",
         target_os = "dragonfly",
+        target_os = "macos",
+        target_os = "android",
     ))]
     fn find_local_ip() {
         let my_local_ip = local_ip();
 
         assert!(matches!(my_local_ip, Ok(IpAddr::V4(_))));
-        println!("BSD 'local_ip': {:?}", my_local_ip);
-    }
-
-    #[test]
-    #[cfg(target_os = "macos")]
-    fn find_local_ip() {
-        let my_local_ip = local_ip().unwrap();
-
-        assert!(matches!(my_local_ip, IpAddr::V4(_)));
-        println!("macOS 'local_ip': {:?}", my_local_ip);
+        println!("Unix 'local_ip': {:?}", my_local_ip);
     }
 
     #[test]
@@ -252,21 +230,14 @@ mod tests {
         target_os = "openbsd",
         target_os = "netbsd",
         target_os = "dragonfly",
+        target_os = "macos",
+        target_os = "android",
     ))]
     fn find_network_interfaces() {
         let network_interfaces = list_afinet_netifas();
 
         assert!(network_interfaces.is_ok());
         assert!(!network_interfaces.unwrap().is_empty());
-    }
-
-    #[test]
-    #[cfg(target_os = "macos")]
-    fn find_network_interfaces() {
-        let network_interfaces = list_afinet_netifas();
-
-        assert!(network_interfaces.is_ok());
-        assert!(network_interfaces.unwrap().len() >= 1);
     }
 
     #[test]
