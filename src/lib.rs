@@ -90,7 +90,7 @@ pub mod windows;
 #[cfg(target_family = "windows")]
 pub use crate::windows::*;
 
-/// Retrieves the local ip address of the machine in the local network from
+/// Retrieves the local IPv4 address of the machine in the local network from
 /// the `AF_INET` family.
 ///
 /// A different approach is taken based on the operative system.
@@ -139,6 +139,76 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         ip_addresses
             .into_iter()
             .find(|ip_address| matches!(ip_address, IpAddr::V4(_)))
+            .ok_or(Error::LocalIpAddressNotFound)
+    }
+
+    // A catch-all case to error if not implemented for OS
+    #[cfg(not(any(
+        target_os = "linux",
+        target_os = "windows",
+        target_os = "macos",
+        target_os = "freebsd",
+        target_os = "openbsd",
+        target_os = "netbsd",
+        target_os = "dragonfly",
+        target_os = "android",
+    )))]
+    {
+        Err(Error::PlatformNotSupported(
+            std::env::consts::OS.to_string(),
+        ))
+    }
+}
+
+/// Retrieves the local IPv6 address of the machine in the local network from
+/// the `AF_INET6` family.
+///
+/// A different approach is taken based on the operative system.
+///
+/// For linux based systems the Netlink socket communication is used to
+/// retrieve the local network interface.
+///
+/// For BSD-based systems the `getifaddrs` approach is taken using `libc`
+///
+/// For Windows systems Win32's IP Helper is used to gather the Local IP
+/// address
+pub fn local_ipv6() -> Result<IpAddr, Error> {
+    #[cfg(target_os = "linux")]
+    {
+        crate::linux::local_ipv6()
+    }
+
+    #[cfg(any(
+        target_os = "freebsd",
+        target_os = "openbsd",
+        target_os = "netbsd",
+        target_os = "dragonfly",
+        target_os = "macos",
+        target_os = "android",
+    ))]
+    {
+        let ifas = crate::unix::list_afinet_netifas_info()?;
+
+        ifas.into_iter()
+            .find_map(|ifa| {
+                if !ifa.is_loopback && ifa.addr.is_ipv6() {
+                    Some(ifa.addr)
+                } else {
+                    None
+                }
+            })
+            .ok_or(Error::LocalIpAddressNotFound)
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use windows_sys::Win32::Networking::WinSock::AF_INET6;
+
+        let ip_addresses = crate::windows::list_local_ip_addresses(AF_INET6)?;
+
+        ip_addresses
+            .into_iter()
+            .find(|ip_address| matches!(ip_address, IpAddr::V6(_)))
             .ok_or(Error::LocalIpAddressNotFound)
     }
 
