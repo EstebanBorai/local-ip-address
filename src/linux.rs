@@ -267,7 +267,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
         rtattrs: RtBuffer::new(),
     };
     let netlink_message = Nlmsghdr::new(
-        None,
+        Some(20),
         Rtm::Getlink,
         NlmFFlags::new(&[NlmF::Request, NlmF::Dump]),
         None,
@@ -328,7 +328,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
         rtattrs: RtBuffer::new(),
     };
     let netlink_message = Nlmsghdr::new(
-        None,
+        Some(20),
         Rtm::Getaddr,
         NlmFFlags::new(&[NlmF::Request, NlmF::Dump]),
         None,
