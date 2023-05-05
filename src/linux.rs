@@ -7,6 +7,7 @@ use neli::consts::nl::{NlmF, NlmFFlags};
 use neli::consts::socket::NlFamily;
 use neli::consts::rtnl::{
     Ifa, IfaFFlags, RtAddrFamily, RtScope, Rtm, RtTable, Rtprot, Rtn, RtmFFlags, RtmF, Rta, Ifla,
+    IffFlags, Arphrd,
 };
 use neli::nl::{NlPayload, Nlmsghdr};
 use neli::rtnl::{Ifaddrmsg, Ifinfomsg, Rtattr, Rtmsg};
@@ -254,25 +255,22 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
 
     // First get list of interfaces via RTM_GETLINK
 
-    let ifroutemsg = Rtmsg {
-        rtm_family: RtAddrFamily::Unspecified,
-        rtm_dst_len: 0,
-        rtm_src_len: 0,
-        rtm_tos: 0,
-        rtm_table: RtTable::Unspec,
-        rtm_protocol: Rtprot::Unspec,
-        rtm_scope: RtScope::Universe,
-        rtm_type: Rtn::Unspec,
-        rtm_flags: RtmFFlags::new(RTM_FLAGS_LOOKUP),
-        rtattrs: RtBuffer::new(),
-    };
+    let ifinfomsg = Ifinfomsg::new(
+        RtAddrFamily::Unspecified,
+        Arphrd::from(0),
+        0,
+        IffFlags::empty(),
+        IffFlags::empty(),
+        RtBuffer::new(),
+    );
+
     let netlink_message = Nlmsghdr::new(
         None,
         Rtm::Getlink,
         NlmFFlags::new(&[NlmF::Request, NlmF::Dump]),
         None,
         None,
-        NlPayload::Payload(ifroutemsg),
+        NlPayload::Payload(ifinfomsg),
     );
 
     netlink_socket
@@ -315,16 +313,12 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
 
     // Secondly get addresses of interfaces via RTM_GETADDR
 
-    let ifroutemsg = Rtmsg {
-        rtm_family: RtAddrFamily::Unspecified,
-        rtm_dst_len: 0,
-        rtm_src_len: 0,
-        rtm_tos: 0,
-        rtm_table: RtTable::Unspec,
-        rtm_protocol: Rtprot::Unspec,
-        rtm_scope: RtScope::Universe,
-        rtm_type: Rtn::Unspec,
-        rtm_flags: RtmFFlags::new(RTM_FLAGS_LOOKUP),
+    let ifaddrmsg = Ifaddrmsg {
+        ifa_family: RtAddrFamily::Unspecified,
+        ifa_prefixlen: 0,
+        ifa_flags: IfaFFlags::empty(),
+        ifa_scope: 0,
+        ifa_index: 0,
         rtattrs: RtBuffer::new(),
     };
     let netlink_message = Nlmsghdr::new(
@@ -333,7 +327,7 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
         NlmFFlags::new(&[NlmF::Request, NlmF::Dump]),
         None,
         None,
-        NlPayload::Payload(ifroutemsg),
+        NlPayload::Payload(ifaddrmsg),
     );
 
     netlink_socket
