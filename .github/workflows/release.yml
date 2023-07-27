@@ -1,32 +1,25 @@
-name: release
+name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        type: choice
+        required: true
+        description: 'Version number to bump'
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
 
 jobs:
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref }}
-          body: ''
-          draft: false
-          prerelease: false
-
-  publish-crate:
-    name: Publish to crates.io
+  publish-dry-run:
+    name: "Runs cargo publish --dry-run"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -35,9 +28,59 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
-      - run: cargo login ${CRATES_IO_TOKEN}
+
+      - name: publish crate
+        run: cargo publish --dry-run
+
+  release:
+    name: Create Release
+    needs: publish-dry-run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Install `cargo-edit`
+        run: cargo install cargo-edit
+      
+      - id: cargo-set-version
+        name: Set Version
+        run: cargo set-version --bump ${{ inputs.version }}
+
+      - name: Set Crate Version as Environment Variable
+        run: |
+          CARGO_TOML_VERSION=$(awk -F ' = ' '$1 ~ /version/ { gsub(/[\"]/, "", $2); printf("%s",$2) }' Cargo.toml)
+          echo "CRATE_VERSION=$CARGO_TOML_VERSION" >> $GITHUB_ENV
+
+      - name: Create Commit
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add .
+          git commit -m "chore: bump version to v$CRATE_VERSION"
+          git push origin main --follow-tags
+
+      - name: Login to Crates.io
+        run: cargo login ${CRATES_IO_TOKEN}
         env:
           CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
 
-      - name: publish crate
+      - name: Publish crate
         run: cargo publish
+
+      - name: Create Release
+        id: create_release
+        uses: actions/github-script@v5
+        with:
+          script: |
+            await github.request(`POST /repos/${{ github.repository }}/releases`, {
+              tag_name: "v${{ env.CRATE_VERSION }}",
+              generate_release_notes: true
+            });
