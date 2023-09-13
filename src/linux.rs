@@ -367,11 +367,12 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
         }
 
         let mut ipaddr = None;
+        let mut label = None;
 
         for rtattr in p.rtattrs.iter() {
             if rtattr.rta_type == Ifa::Label {
                 let ifname = parse_ifname(rtattr.payload().as_ref())?;
-                if_indexes.insert(p.ifa_index, ifname);
+                label = Some(ifname);
             } else if rtattr.rta_type == Ifa::Address {
                 if ipaddr.is_some() {
                     // do not override IFA_LOCAL
@@ -420,7 +421,9 @@ pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
         }
 
         if let Some(ipaddr) = ipaddr {
-            if let Some(ifname) = if_indexes.get(&p.ifa_index) {
+            if let Some(ifname) = label {
+                interfaces.push((ifname, ipaddr));
+            } else if let Some(ifname) = if_indexes.get(&p.ifa_index) {
                 interfaces.push((ifname.clone(), ipaddr));
             }
         }
