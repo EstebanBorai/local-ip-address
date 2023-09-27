@@ -72,6 +72,7 @@ pub use crate::linux::*;
     target_os = "dragonfly",
     target_os = "macos",
     target_os = "android",
+    target_os = "ios",
 ))]
 pub mod unix;
 
@@ -82,6 +83,7 @@ pub mod unix;
     target_os = "dragonfly",
     target_os = "macos",
     target_os = "android",
+    target_os = "ios",
 ))]
 pub use crate::unix::*;
 
@@ -115,6 +117,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         target_os = "dragonfly",
         target_os = "macos",
         target_os = "android",
+        target_os = "ios",
     ))]
     {
         let ifas = crate::unix::list_afinet_netifas_info()?;
@@ -152,6 +155,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         target_os = "netbsd",
         target_os = "dragonfly",
         target_os = "android",
+        target_os = "ios",
     )))]
     {
         Err(Error::PlatformNotSupported(
@@ -185,6 +189,7 @@ pub fn local_ipv6() -> Result<IpAddr, Error> {
         target_os = "dragonfly",
         target_os = "macos",
         target_os = "android",
+        target_os = "ios",
     ))]
     {
         let ifas = crate::unix::list_afinet_netifas_info()?;
@@ -222,6 +227,7 @@ pub fn local_ipv6() -> Result<IpAddr, Error> {
         target_os = "netbsd",
         target_os = "dragonfly",
         target_os = "android",
+        target_os = "ios",
     )))]
     {
         Err(Error::PlatformNotSupported(
@@ -240,6 +246,7 @@ pub fn local_ipv6() -> Result<IpAddr, Error> {
     target_os = "netbsd",
     target_os = "dragonfly",
     target_os = "android",
+    target_os = "ios",
 )))]
 pub fn list_afinet_netifas() -> Result<Vec<(String, IpAddr)>, Error> {
     Err(Error::PlatformNotSupported(
@@ -268,6 +275,7 @@ mod tests {
         target_os = "dragonfly",
         target_os = "macos",
         target_os = "android",
+        target_os = "ios",
     ))]
     fn find_local_ip() {
         let my_local_ip = local_ip();
@@ -302,6 +310,7 @@ mod tests {
         target_os = "dragonfly",
         target_os = "macos",
         target_os = "android",
+        target_os = "ios",
     ))]
     fn find_network_interfaces() {
         let network_interfaces = list_afinet_netifas();
