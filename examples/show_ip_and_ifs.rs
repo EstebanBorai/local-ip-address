@@ -1,4 +1,9 @@
-use local_ip_address::{list_afinet_netifas, local_ip, local_ipv6};
+use local_ip_address::{
+    list_afinet_netifas, 
+    local_ip, 
+    local_ipv6, 
+    local_broadcast_ip,
+};
 
 fn main() {
     match local_ip() {
@@ -11,6 +16,11 @@ fn main() {
         Err(err) => println!("Failed to get local IPv6: {}", err),
     };
 
+    match local_broadcast_ip() {
+        Ok(ip) => println!("Local broadcast IPv4: {}", ip),
+        Err(err) => println!("Failed to get local broadcast IPv4: {}", err),
+    };
+
     match list_afinet_netifas() {
         Ok(netifs) => {
             println!("Got {} interfaces", netifs.len());
@@ -21,3 +31,4 @@ fn main() {
         Err(err) => println!("Failed to get list of network interfaces: {}", err),
     };
 }
+
