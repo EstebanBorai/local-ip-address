@@ -45,7 +45,6 @@ fn local_broadcast_impl(family: RtAddrFamily) -> Result<IpAddr, Error> {
 
     let pref_ip = local_ip()?;
 
-
     let ifaddrmsg = Ifaddrmsg {
         ifa_family: family,
         ifa_prefixlen: 0,
@@ -125,31 +124,25 @@ fn local_broadcast_impl(family: RtAddrFamily) -> Result<IpAddr, Error> {
                     is_match = pref_ip == IpAddr::V6(addr);
                 }
             }
-            if is_match {
-                if rtattr.rta_type == Ifa::Broadcast {
-                    if p.ifa_family == Inet {
-                        let addr = Ipv4Addr::from(u32::from_be(
-                            rtattr.get_payload_as::<u32>().map_err(|_| {
-                                Error::StrategyError(String::from(
-                                    "An error occurred retrieving Netlink's route payload broadcast attribute",
-                                ))
-                            })?,
-                        ));
-                        return Ok(IpAddr::V4(addr));
-                    }                 
-                }
+            if is_match && rtattr.rta_type == Ifa::Broadcast && p.ifa_family == Inet {
+                let addr = Ipv4Addr::from(u32::from_be(
+                    rtattr.get_payload_as::<u32>().map_err(|_| {
+                        Error::StrategyError(String::from(
+                            "An error occurred retrieving Netlink's route payload broadcast attribute",
+                        ))
+                    })?,
+                ));
+                return Ok(IpAddr::V4(addr));
             }
-            if rtattr.rta_type == Ifa::Broadcast {
-                if p.ifa_family == Inet {
-                    let addr = Ipv4Addr::from(u32::from_be(
-                        rtattr.get_payload_as::<u32>().map_err(|_| {
-                            Error::StrategyError(String::from(
-                                "An error occurred retrieving Netlink's route payload attribute",
-                            ))
-                        })?,
-                    ));
-                    broadcast_ip = Some(IpAddr::V4(addr));
-                }            
+            if rtattr.rta_type == Ifa::Broadcast && p.ifa_family == Inet {
+                let addr = Ipv4Addr::from(u32::from_be(rtattr.get_payload_as::<u32>().map_err(
+                    |_| {
+                        Error::StrategyError(String::from(
+                            "An error occurred retrieving Netlink's route payload attribute",
+                        ))
+                    },
+                )?));
+                broadcast_ip = Some(IpAddr::V4(addr));
             }
         }
     }
@@ -609,4 +602,3 @@ mod tests {
         assert_eq!(res.unwrap(), expected);
     }
 }
-

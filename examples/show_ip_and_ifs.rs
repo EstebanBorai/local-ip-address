@@ -1,8 +1,4 @@
-use local_ip_address::{
-    list_afinet_netifas, 
-    local_ip, 
-    local_ipv6, 
-};
+use local_ip_address::{list_afinet_netifas, local_ip, local_ipv6};
 // this is only supported on linux currently
 #[cfg(target_os = "linux")]
 use local_ip_address::local_broadcast_ip;
@@ -35,4 +31,3 @@ fn main() {
         Err(err) => println!("Failed to get list of network interfaces: {}", err),
     };
 }
-
