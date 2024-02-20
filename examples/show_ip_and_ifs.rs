@@ -16,6 +16,8 @@ fn main() {
         Err(err) => println!("Failed to get local IPv6: {}", err),
     };
 
+    // this is only supported on linux currently
+    #[cfg(target_os = "linux")]
     match local_broadcast_ip() {
         Ok(ip) => println!("Local broadcast IPv4: {}", ip),
         Err(err) => println!("Failed to get local broadcast IPv4: {}", err),
