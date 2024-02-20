@@ -43,119 +43,8 @@ fn local_broadcast_impl(family: RtAddrFamily) -> Result<IpAddr, Error> {
     let mut netlink_socket = NlSocketHandle::connect(NlFamily::Route, None, &[])
         .map_err(|err| Error::StrategyError(err.to_string()))?;
 
-    let route_attr = match family {
-        Inet => {
-            let dstip = Ipv4Addr::new(192, 0, 2, 0); // reserved external IP
-            let raw_dstip = u32::from(dstip).to_be();
-            Rtattr::new(None, Rta::Dst, raw_dstip)
-        }
-        Inet6 => {
-            let dstip = Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 0); // reserved external IP
-            let raw_dstip = u128::from(dstip).to_be();
-            Rtattr::new(None, Rta::Dst, raw_dstip)
-        }
-        _ => Err(Error::StrategyError(format!(
-            "Invalid address family given: {:#?}",
-            family
-        )))?,
-    };
+    let pref_ip = local_ip()?;
 
-    let route_attr = route_attr.map_err(|err| Error::StrategyError(err.to_string()))?;
-    let mut route_payload = RtBuffer::new();
-    route_payload.push(route_attr);
-    let ifroutemsg = Rtmsg {
-        rtm_family: family,
-        rtm_dst_len: 0,
-        rtm_src_len: 0,
-        rtm_tos: 0,
-        rtm_table: RtTable::Unspec,
-        rtm_protocol: Rtprot::Unspec,
-        rtm_scope: RtScope::Universe,
-        rtm_type: Rtn::Unspec,
-        rtm_flags: RtmFFlags::new(RTM_FLAGS_LOOKUP),
-        rtattrs: route_payload,
-    };
-    let netlink_message = Nlmsghdr::new(
-        None,
-        Rtm::Getroute,
-        NlmFFlags::new(&[NlmF::Request]),
-        None,
-        None,
-        NlPayload::Payload(ifroutemsg),
-    );
-
-    netlink_socket
-        .send(netlink_message)
-        .map_err(|err| Error::StrategyError(err.to_string()))?;
-
-    let mut pref_ip = None;
-    for response in netlink_socket.iter(false) {
-        if pref_ip.is_some() {
-            break;
-        }
-        let header: Nlmsghdr<Rtm, Rtmsg> = response.map_err(|err| {
-            if let Nlmsgerr(ref err) = err {
-                if err.error == -libc::ENETUNREACH {
-                    return Error::LocalIpAddressNotFound;
-                }
-            }
-            Error::StrategyError(format!(
-                "An error occurred retrieving Netlink's socket response: {err}",
-            ))
-        })?;
-
-        if let NlPayload::Empty = header.nl_payload {
-            continue;
-        }
-
-        if header.nl_type != Rtm::Newroute {
-            return Err(Error::StrategyError(String::from(
-                "The Netlink header type is not the expected",
-            )));
-        }
-
-        let p = header.get_payload().map_err(|_| {
-            Error::StrategyError(String::from(
-                "An error occurred getting Netlink's header payload",
-            ))
-        })?;
-
-        if p.rtm_scope != RtScope::Universe {
-            continue;
-        }
-
-        if p.rtm_family != family {
-            Err(Error::StrategyError(format!(
-                "Invalid address family in Netlink payload: {:?}",
-                p.rtm_family
-            )))?
-        }
-
-        for rtattr in p.rtattrs.iter() {
-            if rtattr.rta_type == Rta::Prefsrc {
-                if p.rtm_family == Inet {
-                    let addr = Ipv4Addr::from(u32::from_be(
-                        rtattr.get_payload_as::<u32>().map_err(|_| {
-                            Error::StrategyError(String::from(
-                                "An error occurred retrieving Netlink's route payload attribute",
-                            ))
-                        })?,
-                    ));
-                    pref_ip = Some(IpAddr::V4(addr));
-                    break;
-                }
-                let addr = Ipv6Addr::from(u128::from_be(
-                    rtattr.get_payload_as::<u128>().map_err(|_| {
-                        Error::StrategyError(String::from(
-                            "An error occurred retrieving Netlink's route payload attribute",
-                        ))
-                    })?,
-                ));
-                pref_ip = Some(IpAddr::V6(addr));
-                break;
-            }
-        }
-    }
 
     let ifaddrmsg = Ifaddrmsg {
         ifa_family: family,
@@ -224,7 +113,7 @@ fn local_broadcast_impl(family: RtAddrFamily) -> Result<IpAddr, Error> {
                             ))
                         })?,
                     ));
-                    is_match = pref_ip == Some(IpAddr::V4(addr));
+                    is_match = pref_ip == IpAddr::V4(addr);
                 } else {
                     let addr = Ipv6Addr::from(u128::from_be(
                         rtattr.get_payload_as::<u128>().map_err(|_| {
@@ -233,7 +122,7 @@ fn local_broadcast_impl(family: RtAddrFamily) -> Result<IpAddr, Error> {
                             ))
                         })?,
                     ));
-                    is_match = pref_ip == Some(IpAddr::V6(addr));
+                    is_match = pref_ip == IpAddr::V6(addr);
                 }
             }
             if is_match {
