@@ -34,6 +34,126 @@ pub fn local_ipv6() -> Result<IpAddr, Error> {
     local_ip_impl(Inet6)
 }
 
+/// Retrieves the local broadcast IPv4 address for this system
+pub fn local_broadcast_ip() -> Result<IpAddr, Error> {
+    local_broadcast_impl(Inet)
+}
+
+fn local_broadcast_impl(family: RtAddrFamily) -> Result<IpAddr, Error> {
+    let mut netlink_socket = NlSocketHandle::connect(NlFamily::Route, None, &[])
+        .map_err(|err| Error::StrategyError(err.to_string()))?;
+
+    let pref_ip = local_ip()?;
+
+    let ifaddrmsg = Ifaddrmsg {
+        ifa_family: family,
+        ifa_prefixlen: 0,
+        ifa_flags: IfaFFlags::empty(),
+        ifa_scope: 0,
+        ifa_index: 0,
+        rtattrs: RtBuffer::new(),
+    };
+    let netlink_message = Nlmsghdr::new(
+        None,
+        Rtm::Getaddr,
+        NlmFFlags::new(&[NlmF::Request, NlmF::Root]),
+        None,
+        None,
+        NlPayload::Payload(ifaddrmsg),
+    );
+
+    netlink_socket
+        .send(netlink_message)
+        .map_err(|err| Error::StrategyError(err.to_string()))?;
+
+    let mut broadcast_ip = None;
+    for response in netlink_socket.iter(false) {
+        let header: Nlmsghdr<Rtm, Ifaddrmsg> = response.map_err(|_| {
+            Error::StrategyError(String::from(
+                "An error occurred retrieving Netlink's socket response",
+            ))
+        })?;
+
+        if let NlPayload::Empty = header.nl_payload {
+            continue;
+        }
+
+        if header.nl_type != Rtm::Newaddr {
+            return Err(Error::StrategyError(String::from(
+                "The Netlink header type is not the expected",
+            )));
+        }
+
+        let p = header.get_payload().map_err(|_| {
+            Error::StrategyError(String::from(
+                "An error occurred getting Netlink's header payload",
+            ))
+        })?;
+
+        if RtScope::from(p.ifa_scope) != RtScope::Universe {
+            continue;
+        }
+
+        if p.ifa_family != family {
+            Err(Error::StrategyError(format!(
+                "Invalid family in Netlink payload: {:?}",
+                p.ifa_family
+            )))?
+        }
+
+        let mut is_match = false;
+        for rtattr in p.rtattrs.iter() {
+            if rtattr.rta_type == Ifa::Local {
+                if p.ifa_family == Inet {
+                    let addr = Ipv4Addr::from(u32::from_be(
+                        rtattr.get_payload_as::<u32>().map_err(|_| {
+                            Error::StrategyError(String::from(
+                                "An error occurred retrieving Netlink's route payload attribute",
+                            ))
+                        })?,
+                    ));
+                    is_match = pref_ip == IpAddr::V4(addr);
+                } else {
+                    let addr = Ipv6Addr::from(u128::from_be(
+                        rtattr.get_payload_as::<u128>().map_err(|_| {
+                            Error::StrategyError(String::from(
+                                "An error occurred retrieving Netlink's route payload attribute",
+                            ))
+                        })?,
+                    ));
+                    is_match = pref_ip == IpAddr::V6(addr);
+                }
+            }
+            if is_match && rtattr.rta_type == Ifa::Broadcast && p.ifa_family == Inet {
+                let addr = Ipv4Addr::from(u32::from_be(
+                    rtattr.get_payload_as::<u32>().map_err(|_| {
+                        Error::StrategyError(String::from(
+                            "An error occurred retrieving Netlink's route payload broadcast attribute",
+                        ))
+                    })?,
+                ));
+                return Ok(IpAddr::V4(addr));
+            }
+            if rtattr.rta_type == Ifa::Broadcast && p.ifa_family == Inet {
+                let addr = Ipv4Addr::from(u32::from_be(rtattr.get_payload_as::<u32>().map_err(
+                    |_| {
+                        Error::StrategyError(String::from(
+                            "An error occurred retrieving Netlink's route payload attribute",
+                        ))
+                    },
+                )?));
+                broadcast_ip = Some(IpAddr::V4(addr));
+            }
+        }
+    }
+
+    if let Some(broadcast_ip) = broadcast_ip {
+        return Ok(broadcast_ip);
+    }
+
+    Err(Error::LocalIpAddressNotFound)
+}
+
 fn local_ip_impl(family: RtAddrFamily) -> Result<IpAddr, Error> {
     let mut netlink_socket = NlSocketHandle::connect(NlFamily::Route, None, &[])
         .map_err(|err| Error::StrategyError(err.to_string()))?;
