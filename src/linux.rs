@@ -160,7 +160,10 @@ fn local_ip_impl(family: RtAddrFamily) -> Result<IpAddr, Error> {
 
     match local_ip_impl_route(family, &mut netlink_socket) {
         Ok(ip_addr) => Ok(ip_addr),
-        Err(_error) => local_ip_impl_addr(family, &mut netlink_socket),
+        Err(error) if error == Error::LocalIpAddressNotFound => {
+            local_ip_impl_addr(family, &mut netlink_socket)
+        }
+        Err(e) => Err(e),
     }
 }
 
