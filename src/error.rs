@@ -1,4 +1,4 @@
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
     /// Returned when `local_ip` is unable to find the system's local IP address
     /// in the collection of network interfaces

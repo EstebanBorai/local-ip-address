@@ -158,6 +158,17 @@ fn local_ip_impl(family: RtAddrFamily) -> Result<IpAddr, Error> {
     let mut netlink_socket = NlSocketHandle::connect(NlFamily::Route, None, &[])
         .map_err(|err| Error::StrategyError(err.to_string()))?;
 
+    match local_ip_impl_route(family, &mut netlink_socket) {
+        Ok(ip_addr) => Ok(ip_addr),
+        Err(Error::LocalIpAddressNotFound) => local_ip_impl_addr(family, &mut netlink_socket),
+        Err(e) => Err(e),
+    }
+}
+
+fn local_ip_impl_route(
+    family: RtAddrFamily,
+    netlink_socket: &mut NlSocketHandle,
+) -> Result<IpAddr, Error> {
     let route_attr = match family {
         Inet => {
             let dstip = Ipv4Addr::new(192, 0, 2, 0); // reserved external IP
@@ -266,7 +277,13 @@ fn local_ip_impl(family: RtAddrFamily) -> Result<IpAddr, Error> {
             }
         }
     }
+    Err(Error::LocalIpAddressNotFound)
+}
 
+fn local_ip_impl_addr(
+    family: RtAddrFamily,
+    netlink_socket: &mut NlSocketHandle,
+) -> Result<IpAddr, Error> {
     let ifaddrmsg = Ifaddrmsg {
         ifa_family: family,
         ifa_prefixlen: 0,
