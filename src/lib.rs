@@ -124,7 +124,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
 
         ifas.into_iter()
             .find_map(|ifa| {
-                if !ifa.is_loopback && ifa.addr.is_ipv4() {
+                if !ifa.is_loopback && ifa.addr.is_ipv4() && !ifa.is_mobile_data() {
                     Some(ifa.addr)
                 } else {
                     None
@@ -196,7 +196,7 @@ pub fn local_ipv6() -> Result<IpAddr, Error> {
 
         ifas.into_iter()
             .find_map(|ifa| {
-                if !ifa.is_loopback && ifa.addr.is_ipv6() {
+                if !ifa.is_loopback && ifa.addr.is_ipv6() && !ifa.is_mobile_data() {
                     Some(ifa.addr)
                 } else {
                     None
