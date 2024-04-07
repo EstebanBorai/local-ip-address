@@ -45,6 +45,13 @@ pub(crate) struct AfInetInfo {
     pub is_loopback: bool,
 }
 
+impl AfInetInfo {
+    /// Determines if an interface is used for mobile_data
+    pub(crate) fn is_mobile_data(&self) -> bool {
+        self.iname.contains("rmnet_data")
+    }
+}
+
 // Internal method to list AF_INET info in a struct.  This method is used by
 // list_afiinet_netifas and local_ip,
 pub(crate) fn list_afinet_netifas_info() -> Result<Vec<AfInetInfo>, Error> {
