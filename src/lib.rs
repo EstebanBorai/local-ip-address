@@ -116,8 +116,7 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         target_os = "netbsd",
         target_os = "dragonfly",
         target_os = "macos",
-        target_os = "android",
-        target_os = "ios",
+        target_os = "android"
     ))]
     {
         let ifas = crate::unix::list_afinet_netifas_info()?;
@@ -125,6 +124,23 @@ pub fn local_ip() -> Result<IpAddr, Error> {
         ifas.into_iter()
             .find_map(|ifa| {
                 if !ifa.is_loopback && ifa.addr.is_ipv4() && !ifa.is_mobile_data() {
+                    Some(ifa.addr)
+                } else {
+                    None
+                }
+            })
+            .ok_or(Error::LocalIpAddressNotFound)
+    }
+
+    #[cfg(any(
+        target_os = "ios"
+    ))]
+    {
+        let ifas = crate::unix::list_afinet_netifas_info()?;
+
+        ifas.into_iter()
+            .find_map(|ifa| {
+                if !ifa.is_loopback && ifa.addr.is_ipv4() && ifa.iname == "en0" {
                     Some(ifa.addr)
                 } else {
                     None
@@ -188,8 +204,7 @@ pub fn local_ipv6() -> Result<IpAddr, Error> {
         target_os = "netbsd",
         target_os = "dragonfly",
         target_os = "macos",
-        target_os = "android",
-        target_os = "ios",
+        target_os = "android"
     ))]
     {
         let ifas = crate::unix::list_afinet_netifas_info()?;
@@ -197,6 +212,23 @@ pub fn local_ipv6() -> Result<IpAddr, Error> {
         ifas.into_iter()
             .find_map(|ifa| {
                 if !ifa.is_loopback && ifa.addr.is_ipv6() && !ifa.is_mobile_data() {
+                    Some(ifa.addr)
+                } else {
+                    None
+                }
+            })
+            .ok_or(Error::LocalIpAddressNotFound)
+    }
+
+    #[cfg(any(
+        target_os = "ios"
+    ))]
+    {
+        let ifas = crate::unix::list_afinet_netifas_info()?;
+
+        ifas.into_iter()
+            .find_map(|ifa| {
+                if !ifa.is_loopback && ifa.addr.is_ipv6() && ifa.iname == "en0" {
                     Some(ifa.addr)
                 } else {
                     None
