@@ -10,7 +10,7 @@ use std::{
 
 use windows_sys::Win32::{
     Foundation::{
-        GetLastError, BOOL, ERROR_ADDRESS_NOT_ASSOCIATED, ERROR_BUFFER_OVERFLOW,
+        GetLastError, LocalFree, BOOL, ERROR_ADDRESS_NOT_ASSOCIATED, ERROR_BUFFER_OVERFLOW,
         ERROR_INSUFFICIENT_BUFFER, ERROR_INVALID_PARAMETER, ERROR_NOT_ENOUGH_MEMORY,
         ERROR_NOT_SUPPORTED, ERROR_NO_DATA, ERROR_SUCCESS, WIN32_ERROR,
     },
@@ -21,11 +21,8 @@ use windows_sys::Win32::{
     Networking::WinSock::{
         ADDRESS_FAMILY, AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR,
     },
-    System::{
-        Diagnostics::Debug::{
-            FormatMessageW, FORMAT_MESSAGE_ALLOCATE_BUFFER, FORMAT_MESSAGE_FROM_SYSTEM,
-        },
-        Memory::LocalFree,
+    System::Diagnostics::Debug::{
+        FormatMessageW, FORMAT_MESSAGE_ALLOCATE_BUFFER, FORMAT_MESSAGE_FROM_SYSTEM,
     },
 };
 
@@ -260,7 +257,7 @@ fn format_error_code(error_code: WIN32_ERROR) -> String {
     let error_message = String::from_utf16_lossy(slice);
 
     unsafe {
-        LocalFree(wide_ptr as isize);
+        LocalFree(&mut wide_ptr as *mut _ as *mut _);
     }
 
     error_message
